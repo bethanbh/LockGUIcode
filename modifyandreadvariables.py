@@ -20,14 +20,20 @@ from pyqtgraph.Qt import QtCore, QtGui
 import pyqtgraph.dockarea as dockarea
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import time
+import datetime
+from datetime import date
+
+import serial
+import serial.tools.list_ports
 
 from PyQt5.QtGui import QFont
 
 import upkeep
 USUAL_DIR = os.getcwd()
 print(USUAL_DIR)
+DATEMARKER = str(date.today())
 
-DIR_PARAMS = USUAL_DIR+'//lock_params'
+DIR_PARAMS = USUAL_DIR+f'//({DATEMARKER})_lock_params'
 
 '''This bit will allow you to type in new values for the gains etc, and then write them to the arduino'''
 
@@ -50,6 +56,11 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         self.cavoffsetpoint = 7
         self.highthreshold = 8
         self.lowthreshold = 9
+        
+        self.baudrate = 230400
+        
+        self.general_things = upkeep.Upkeep(self)
+        
         #self.t_max = 1000
         #self.time_resolution = 1
         #self.table_pulses = np.zeros((8,self.t_max))
@@ -211,16 +222,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
            
            ############################################################################
            
-           #reading data from the arduino
-    #def Readfromarduino():
-    #    comport = upkeep.parameter_loop_comboBox.currentText()
-    #    print(comport)
-               #arduino = serial.Serial('COM1', self.baudrate, timeout=.1)
-#while True:
-#	data = arduino.readline()[:-2] #the last bit gets rid of the new-line chars
-#	if data:
-#		print data
-   # Readfromarduino()
+
    
    
     def GenerateParamDict(self):
@@ -261,11 +263,86 @@ class ModifyandRead_variable(QtGui.QMainWindow):
                     msg += '\n'
                     f.write(msg)
             f.close()
-       
+ 
+
+    def TalktoArduino(self):
+        #choose the COM port to set up for serial communication using the drop down menu
+        comport = self.general_things.parameter_loop_comboBox.currentText()
+
+        try:
+            arduino = serial.Serial(comport, self.baudrate, timeout=.1)#should hopefully open the serial communication?
+            print('COM port open in talking')
+            
+            #set cavity P gain
+            arduino.write(str.encode('pa!')) #send this message to the arduino, activates the message_parser function- p means it'll print out the variable associated with the key a
+            cavPgain = arduino.readline() #set this value as the readout from the arduino
+            self.cavPgain = cavPgain.decode() #decode from bytes to string
+            
+            #set cavity I gain
+            arduino.write(str.encode('pb!'))
+            cavIgain = arduino.readline()
+            self.cavIgain = cavIgain.decode()
+            
+            #set laser P gain
+            arduino.write(str.encode('pc!'))
+            laserPgain = arduino.readline()
+            self.laserPgain = laserPgain.decode()
+            
+            #set laser I gain
+            arduino.write(str.encode('pd!'))
+            laserIgain = arduino.readline()
+            self.laserIgain = laserIgain.decode()
+            
+            #set laser D gain
+            arduino.write(str.encode('pq!'))
+            laserDgain = arduino.readline()
+            self.laserDgain = laserDgain.decode()
+            
+            #set laser ref
+            arduino.write(str.encode('pe!'))
+            laserfreqsetpoint = arduino.readline()
+            self.laserfreqsetpoint = laserfreqsetpoint.decode()
+            
+            #set cavity offset
+            arduino.write(str.encode('pp!'))
+            cavoffsetpoint = arduino.readline()
+            self.cavoffsetpoint = cavoffsetpoint.decode()
+            
+            #set high threshold
+            arduino.write(str.encode('pk!'))
+            highthreshold = arduino.readline()
+            self.highthreshold = highthreshold.decode()
+            
+            #set low threshold
+            arduino.write(str.encode('pj!'))
+            lowthreshold = arduino.readline()
+            self.lowthreshold = lowthreshold.decode()
+            
+            
+            
+            arduino.close()
+            print('port closed in talking')
+        except (OSError, serial.SerialException):
+            print('whoops the arduino is not there')        
+ 
+    
         
     def WhenValuesBtnPress(self):
         #should talk to the arduino and update the interal gain values from what we have
-        #PUT THIS IN LATER
+        self.TalktoArduino()
+        
+        #then present all the updated values in the nice read boxes
+        #self.laserfreqsetpointvalue = QtGui.QLabel(str(self.laserfreqsetpoint))
+        self.cavPgainvalue.setText(str(self.cavPgain))
+        self.cavIgainvalue.setText(str(self.cavIgain))
+        self.laserPgainvalue.setText(str(self.laserPgain))
+        self.laserIgainvalue.setText(str(self.laserIgain))
+        self.laserDgainvalue.setText(str(self.laserDgain))
+        self.laserfreqsetpointvalue.setText(str(self.laserfreqsetpoint))
+        self.cavoffsetpointvalue.setText(str(self.cavoffsetpoint))
+        self.highthresholdvalue.setText(str(self.highthreshold))
+        self.lowthresholdvalue.setText(str(self.lowthreshold))
+        
         
         #Then give the option to save if the save values is checked
         if self.save_params_checkbox.isChecked():
@@ -282,8 +359,17 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         self.cavoffsetpointLE.setStyleSheet("border: 1px solid black; background-color : None")
         self.highthresholdLE.setStyleSheet("border: 1px solid black; background-color : None")
         self.lowthresholdLE.setStyleSheet("border: 1px solid black; background-color : None")
-       # self.lowthresholdvalue.setStyleSheet("border: 1px solid black, background : None")
-        
+
+
+       
+  
+    
+  
+    
+  
+    
+  
+    
        
     def LoadParameters(self):
     # occurs when load parameters button is opened
@@ -448,5 +534,4 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         
         #change colour to alert to an edit
         self.lowthresholdLE.setStyleSheet("border: 1px solid black; background-color : lightsalmon")
-    
     

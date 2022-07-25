@@ -59,7 +59,9 @@ class schlagmuller_window(QtWidgets.QMainWindow):
         
         #testzone
         self.general_things.Readfromarduino()
+        self.general_things.TalktoArduino()
         #self.modifyandread_variables.SaveParameters()
+        
         
     def createDocks(self):
         

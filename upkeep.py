@@ -48,7 +48,10 @@ class Upkeep(QtGui.QMainWindow):
         self.lowthreshold = 9
         self.examplefilename = USUAL_DIR
         
-        self.list_comports = []
+        self.baudrate = 230400 #this is defined in arduino code, not sure how to extract it so we'll just define it ourselves here
+        
+        
+        #self.general_things = upkeep.Upkeep(self)
         #self.t_max = 1000
         #self.time_resolution = 1
         #self.table_pulses = np.zeros((8,self.t_max))
@@ -170,16 +173,40 @@ class Upkeep(QtGui.QMainWindow):
             
     def Readfromarduino(self):
         comport = self.parameter_loop_comboBox.currentText()
-        print(f' The selected COM port is: {comport}') #okay, so this does print out the COM port okay! (tested in testzone in STCLGUI page)
-               #arduino = serial.Serial('COM1', self.baudrate, timeout=.1)
-#while True:
-#	data = arduino.readline()[:-2] #the last bit gets rid of the new-line chars
-#	if data:
-#		print data
+        #print(f' The selected COM port is: {comport}') #okay, so this does print out the COM port okay! (tested in testzone in STCLGUI page)
+        #print(type(comport))
+        try:
+            arduino = serial.Serial(comport, self.baudrate, timeout=.1)#should hopefully open the serial communication?
+            print('COM port open')
+
+            data = arduino.readline()#[:-2] #the last bit gets rid of the new-line cha
+            print(data)
+            
+            arduino.close()
+            print('port closed')
+        except (OSError, serial.SerialException):
+            print('whoops the arduino is not there')
     
 
-    #def SaveParameters(self):
-        #This should read the parameters from the 
+    def TalktoArduino(self):
+        comport = self.parameter_loop_comboBox.currentText()
+        #print(f' The selected COM port is: {comport}') #okay, so this does print out the COM port okay! (tested in testzone in STCLGUI page)
+        #print(type(comport))
+        try:
+            arduino = serial.Serial(comport, self.baudrate, timeout=.1)#should hopefully open the serial communication?
+            print('COM port open in talking')
+
+            
+            
+            arduino.write(str.encode('pa!'))
+            
+            data = arduino.readline()#[:-2] #the last bit gets rid of the new-line cha
+            print(data)
+            
+            arduino.close()
+            print('port closed in talking')
+        except (OSError, serial.SerialException):
+            print('whoops the arduino is not there')
 
     
 

@@ -127,3 +127,20 @@ def SaveParameters(dict): #this will happen after the talking to the arduino bit
                 msg += '\n'
                 f.write(msg)
         f.close()
+   
+list_serialports = serial.tools.list_ports.comports()
+list_comports = []
+for n in range(len(list_serialports)):
+    try:
+        test = list_serialports[n][0]
+        s = serial.Serial(test)
+        s.close()
+        list_comports.append(test)
+    except (OSError, serial.SerialException):
+        print('oh no an error')
+        
+comport = list_comports[0]
+print(f' The selected COM port is: {comport}') #okay, so this does print out the COM port okay! (tested in testzone in STCLGUI page)
+
+arduino = serial.Serial(comport)#should hopefully open the serial communication?
+arduino.close()
