@@ -57,9 +57,18 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         self.highthreshold = 8
         self.lowthreshold = 9
         
+        self.laserfreqsetpointMS = 0.6
+        self.cavoffsetpointMS = 0.7
+        self.highthresholdMV = 0.8
+        self.lowthresholdMV = 0.9
+        
+        self.tempstorageLFSP = 10 
+        self.tempstorageCOSP = 13
+        
         self.baudrate = 230400
         
         self.general_things = upkeep.Upkeep(self)
+        
         
         #self.t_max = 1000
         #self.time_resolution = 1
@@ -148,12 +157,14 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             
             self.laserfreqsetpointLE = QtGui.QLineEdit(str(self.laserfreqsetpoint))
             self.laserfreqsetpointLE.returnPressed.connect(self.laserfreqsetpointChangeText)
+            self.laserfreqsetpointLE.textEdited.connect(self.TextEditmsUnitSortOut)
             self.label_laserfreqsetpointLE = QtGui.QLabel('Laser setpoint')
             self.laserfreqsetpointvalue = QtGui.QLabel(str(self.laserfreqsetpoint))
             self.laserfreqsetpointvalue.setStyleSheet("border: 1px solid black")
             
             self.cavoffsetpointLE = QtGui.QLineEdit(str(self.cavoffsetpoint))
             self.cavoffsetpointLE.returnPressed.connect(self.cavoffsetpointChangeText)
+            self.cavoffsetpointLE.textEdited.connect(self.TextEditmsUnitSortOut)
             self.label_cavoffsetpointLE = QtGui.QLabel('Cavity setpoint')
             self.cavoffsetpointvalue = QtGui.QLabel(str(self.cavoffsetpoint))
             self.cavoffsetpointvalue.setStyleSheet("border: 1px solid black")
@@ -171,9 +182,16 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             self.lowthresholdvalue.setStyleSheet("border: 1px solid black")
             
             self.blankspace= QtGui.QLabel('')
+            self.blankspace2= QtGui.QLabel('')
             
             self.saveparamsbtn = QtGui.QPushButton('Save parameters?')
             self.saveparamsbtn.setStyleSheet(':hover { background: papayawhip }')
+    
+            self.swapunits_label= QtGui.QLabel('Swap units')
+            self.swaptoms_btn = QtGui.QCheckBox('ms?')
+            self.swaptoms_btn.stateChanged.connect(self.WhenmsChecked)
+            self.swaptomV_btn = QtGui.QCheckBox('mV?')
+            self.swaptomV_btn.stateChanged.connect(self.WhenmVChecked)
     
     
             #buttons at the top
@@ -214,7 +232,15 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             self.w1.addWidget(self.lowthresholdvalue, row = 11, col = 3)
             
             
-            self.w1.addWidget(self.blankspace, row = 12, col= 0, colspan= 4) #this is literally just to help with the spacing
+            self.w1.addWidget(self.blankspace2, row = 12, col= 0, colspan= 1) #this is literally just to help with the spacing
+            
+            self.w1.addWidget(self.swaptoms_btn, row = 13, col= 2, colspan= 1) #this is literally just to help with the spacing
+            
+            self.w1.addWidget(self.swaptomV_btn, row = 13, col= 3, colspan= 1) #this is literally just to help with the spacing
+            self.w1.addWidget(self.swapunits_label, row = 13, col= 1, colspan= 1) #this is literally just to help with the spacing
+          
+            
+            self.w1.addWidget(self.blankspace, row = 14, col= 0, colspan= 4) #this is literally just to help with the spacing
             
           
             self.d1.addWidget(self.w1, row=0, col=0)
@@ -246,7 +272,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
 
     def SaveParameters(self): #this will happen after the talking to the arduino bit, and updating the values- so the dict part should be actively saving the new values
         #want this to happen when you click the button, and also when you press lock if the box is checked
-        dict = self.GenerateParamDict() 
+        dict = self.GenerateParamDict()  #saves the values in arduino units, not ms/mV
 
         #then need to actually save the parameters
         param_file = QtGui.QFileDialog.getSaveFileName(self, 'Save Params', DIR_PARAMS) 
@@ -323,7 +349,10 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             arduino.close()
             print('port closed in talking')
         except (OSError, serial.SerialException):
-            print('whoops the arduino is not there')        
+            self.general_things.errordetails.setText('whoops the arduino is not there')
+            print('whoops the arduino is not there') 
+            #this line isn't doing what it's supposed to :(
+            
  
     
         
@@ -333,15 +362,22 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         
         #then present all the updated values in the nice read boxes
         #self.laserfreqsetpointvalue = QtGui.QLabel(str(self.laserfreqsetpoint))
-        self.cavPgainvalue.setText(str(self.cavPgain))
-        self.cavIgainvalue.setText(str(self.cavIgain))
-        self.laserPgainvalue.setText(str(self.laserPgain))
-        self.laserIgainvalue.setText(str(self.laserIgain))
-        self.laserDgainvalue.setText(str(self.laserDgain))
-        self.laserfreqsetpointvalue.setText(str(self.laserfreqsetpoint))
-        self.cavoffsetpointvalue.setText(str(self.cavoffsetpoint))
-        self.highthresholdvalue.setText(str(self.highthreshold))
-        self.lowthresholdvalue.setText(str(self.lowthreshold))
+        
+        self.cavPgainvalue.setText(str(round(float(self.cavPgain),3)))
+        self.cavIgainvalue.setText(str(round(float(self.cavIgain),3)))
+        self.laserPgainvalue.setText(str(round(float(self.laserPgain),3)))
+        self.laserIgainvalue.setText(str(round(float(self.laserIgain),3)))
+        self.laserDgainvalue.setText(str(round(float(self.laserDgain),3)))
+        if self.swaptoms_btn.isChecked(): #should these values be loaded in ms or AU
+            self.laserfreqsetpointMS = float(self.laserfreqsetpoint)/84000
+            self.laserfreqsetpointvalue.setText(str(round(self.laserfreqsetpointMS,3)))
+            self.cavoffsetpointMS = float(self.cavoffsetpoint)/84000
+            self.cavoffsetpointvalue.setText(str(round(self.cavoffsetpointMS,3)))
+        else:
+            self.laserfreqsetpointvalue.setText(str(round(float(self.laserfreqsetpoint),3)))
+            self.cavoffsetpointvalue.setText(str(round(float(self.cavoffsetpoint),3)))
+        self.highthresholdvalue.setText(str(round(float(self.highthreshold),3)))
+        self.lowthresholdvalue.setText(str(round(float(self.lowthreshold),3)))
         
         
         #Then give the option to save if the save values is checked
@@ -390,14 +426,13 @@ class ModifyandRead_variable(QtGui.QMainWindow):
                 dict[key] = word
         f.close()
         
-        print('yup')
+        #print('yup')
         
         #now want to send these new values to arduino
         #PUT THIS IN LATER
         
         #for now, update the internal values directly instead
         self.cavPgain = dict['cavPgain']
-        print(f'Updated cav P gain is {self.cavPgain}')
         self.cavIgain = dict['cavIgain']
         self.laserPgain = dict['laserPgain']
         self.laserIgain = dict['laserIgain'] 
@@ -406,6 +441,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         self.cavoffsetpoint = dict['cavoffsetpoint']
         self.highthreshold = dict['highthreshold']
         self.lowthreshold = dict['lowthreshold']
+        print(f'Loaded parameters from {param_file[0]}')
         
         #then update what's displayed in the write boxes with the values from the file
         #this doesn't really do anything, just to show you what you've loaded- the update to arduino section previous should do all the important stuff
@@ -415,22 +451,26 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         self.laserPgainLE.setText(str(dict['laserPgain']))
         self.laserIgainLE.setText(str(dict['laserIgain'] ))
         self.laserDgainLE.setText(str(dict['laserDgain']))
-        self.laserfreqsetpointLE.setText(str(dict['laserfreqsetpoint']))
-        self.cavoffsetpointLE.setText(str(dict['cavoffsetpoint']))
+        if self.swaptoms_btn.isChecked(): #display in ms (won't send to arduino in ms)
+            self.laserfreqsetpointLE.setText(str(np.round(dict['laserfreqsetpoint']/84000,4)))
+            self.cavoffsetpointLE.setText(str(np.round(dict['cavoffsetpoint']/84000,4)))
+        else:
+            self.laserfreqsetpointLE.setText(str(dict['laserfreqsetpoint']))
+            self.cavoffsetpointLE.setText(str(dict['cavoffsetpoint']))
         self.highthresholdLE.setText(str(dict['highthreshold']))
         self.lowthresholdLE.setText(str(dict['lowthreshold']))
         
         #then change colour of write boxes to show that there's been an update that hasn't been transferred to the read boxes
         #should then press read values to pull the now updated values from the arduino directly into the read boxes
-        self.cavPgainLE.setStyleSheet("border: 1px solid black; background-color : thistle")
-        self.cavIgainLE.setStyleSheet("border: 1px solid black; background-color : thistle")
-        self.laserPgainLE.setStyleSheet("border: 1px solid black; background-color : thistle")
-        self.laserIgainLE.setStyleSheet("border: 1px solid black; background-color : thistle")
-        self.laserDgainLE.setStyleSheet("border: 1px solid black; background-color : thistle")
-        self.laserfreqsetpointLE.setStyleSheet("border: 1px solid black; background-color : thistle")
-        self.cavoffsetpointLE.setStyleSheet("border: 1px solid black; background-color : thistle")
+        self.cavPgainLE.setStyleSheet("border: 1px solid black; background-color : lightcoral")
+        self.cavIgainLE.setStyleSheet("border: 1px solid black; background-color : lightsalmon")
+        self.laserPgainLE.setStyleSheet("border: 1px solid black; background-color : peachpuff")
+        self.laserIgainLE.setStyleSheet("border: 1px solid black; background-color : lemonchiffon")
+        self.laserDgainLE.setStyleSheet("border: 1px solid black; background-color : palegreen")
+        self.laserfreqsetpointLE.setStyleSheet("border: 1px solid black; background-color : lightcyan")
+        self.cavoffsetpointLE.setStyleSheet("border: 1px solid black; background-color : paleturquoise")
         self.highthresholdLE.setStyleSheet("border: 1px solid black; background-color : thistle")
-        self.lowthresholdLE.setStyleSheet("border: 1px solid black; background-color : thistle")
+        self.lowthresholdLE.setStyleSheet("border: 1px solid black; background-color : plum")
         
         
         
@@ -495,8 +535,8 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         #want to send the new value to arduino
         #PUT THIS IN LATER
         #for now, update the internal value myself
-        self.laserfreqsetpoint = self.laserfreqsetpointLE.text()
-        #print(self.cavPgain)
+        self.laserfreqsetpoint = self.tempstorageLFSP#self.laserfreqsetpointLE.text()
+        print(self.laserfreqsetpoint)
         #change colour to alert to an edit
         self.laserfreqsetpointLE.setStyleSheet("border: 1px solid black; background-color : lightsalmon")
         
@@ -506,7 +546,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         #want to send the new value to arduino
         #PUT THIS IN LATER
         #for now, update the internal value myself
-        self.cavoffsetpoint = self.cavoffsetpointLE.text()
+        self.cavoffsetpoint = self.tempstorageCOSP#self.cavoffsetpointLE.text()
         #print(self.cavPgain)
         #change colour to alert to an edit
         self.cavoffsetpointLE.setStyleSheet("border: 1px solid black; background-color : lightsalmon")
@@ -535,3 +575,62 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         #change colour to alert to an edit
         self.lowthresholdLE.setStyleSheet("border: 1px solid black; background-color : lightsalmon")
     
+
+    def WhenmsChecked(self):
+        #this occurs when the ms swap units box is checked
+        #just changes how the value is displayed, doesn't alter the actual value being stored and sent to arduino
+        if self.swaptoms_btn.isChecked():
+            self.label_laserfreqsetpointLE.setStyleSheet("color : deeppink")
+            self.label_cavoffsetpointLE.setStyleSheet("color : deeppink")
+            
+            #change the units that things are displayed in:
+            #read boxes
+            self.laserfreqsetpointMS = float(self.laserfreqsetpoint)/84000
+            self.laserfreqsetpointvalue.setText(str(np.round(self.laserfreqsetpointMS,3)))
+            #write box
+            self.tempstorageLFSP = self.laserfreqsetpointLE.text()
+            LFSPinms = float(self.tempstorageLFSP)/84000
+            self.laserfreqsetpointLE.setText(str(np.round(LFSPinms,3)))
+           
+            #read boxes
+            self.cavoffsetpointMS = float(self.cavoffsetpoint)/84000
+            self.cavoffsetpointvalue.setText(str(np.round(self.cavoffsetpointMS,3)))
+            #write box
+            self.tempstorageCOSP = self.cavoffsetpointLE.text()
+            COSPinms = float(self.tempstorageCOSP)/84000
+            self.cavoffsetpointLE.setText(str(np.round(COSPinms,3)))
+            
+                
+        else:
+            self.label_laserfreqsetpointLE.setStyleSheet("color : black")
+            self.label_cavoffsetpointLE.setStyleSheet("color : black")
+            
+            #read boxes
+            self.laserfreqsetpointvalue.setText(str(np.round(float(self.laserfreqsetpoint),3)))
+            self.cavoffsetpointvalue.setText(str(np.round(float(self.cavoffsetpoint),3)))
+        
+            #write box
+            self.laserfreqsetpointLE.setText(str(np.round(float(self.tempstorageLFSP),3)))
+            self.cavoffsetpointLE.setText(str(np.round(float(self.tempstorageCOSP),3)))
+        
+    def TextEditmsUnitSortOut(self):
+        if self.swaptoms_btn.isChecked():
+            #then we're writing in ms
+            placeholder = self.laserfreqsetpointLE.text()
+            self.tempstorageLFSP = float(placeholder)*84000
+            placeholder2 = self.cavoffsetpointLE.text()
+            self.tempstorageCOSP = float(placeholder2)*84000
+        else:
+            #we're writing in AU
+            self.tempstorageLFSP = self.laserfreqsetpointLE.text()
+            self.tempstorageCOSP = self.cavoffsetpointLE.text()
+        
+    def WhenmVChecked(self):
+        #this occurs when the mV swap units box is checked
+        #just changes how the value is displayed, doesn't alter the actual value being stored and sent to arduino
+        if self.swaptomV_btn.isChecked():
+            self.label_highthresholdLE.setStyleSheet("color : deeppink")
+            self.label_lowthresholdLE.setStyleSheet("color : deeppink")
+        else:
+            self.label_highthresholdLE.setStyleSheet("color : black")
+            self.label_lowthresholdLE.setStyleSheet("color : black")

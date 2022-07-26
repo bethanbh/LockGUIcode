@@ -60,6 +60,7 @@ class schlagmuller_window(QtWidgets.QMainWindow):
         #testzone
         self.general_things.Readfromarduino()
         self.general_things.TalktoArduino()
+        self.readout.ExtractError()
         #self.modifyandread_variables.SaveParameters()
         
         

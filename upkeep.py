@@ -193,7 +193,7 @@ class Upkeep(QtGui.QMainWindow):
         #print(f' The selected COM port is: {comport}') #okay, so this does print out the COM port okay! (tested in testzone in STCLGUI page)
         #print(type(comport))
         try:
-            arduino = serial.Serial(comport, self.baudrate, timeout=.1)#should hopefully open the serial communication?
+            arduino = serial.Serial(comport, self.baudrate, timeout=.1) #should hopefully open the serial communication?
             print('COM port open in talking')
 
             
