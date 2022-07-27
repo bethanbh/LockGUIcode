@@ -102,7 +102,8 @@ class Upkeep(QtGui.QMainWindow):
             for n in range(len(list_serialports)):
                 test = list_serialports[n][0]
                 self.parameter_loop_comboBox.addItem(str(test)) 
-        
+            
+            
             
             self.w1.addWidget(self.label_comport, row=0, col=0,colspan = 1)
             self.w1.addWidget(self.parameter_loop_comboBox, row = 0, col = 1,colspan = 1)  
@@ -159,6 +160,9 @@ class Upkeep(QtGui.QMainWindow):
             self.status.setStyleSheet(':hover { background: red }') #ideally will want this to go red if bad stuff is happening
             self.errordetails = QtGui.QLabel('Error details would go here')
             self.errordetails.setStyleSheet('border: 1px solid black')
+         
+            if len(list_serialports) == 0:
+                self.errordetails.setText('No arduino connection detected')
          
             self.w4.addWidget(self.label_error, row=0, col=0, colspan=1)
             self.w4.addWidget(self.status, row=0, col=2)

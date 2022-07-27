@@ -192,6 +192,9 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             self.swaptoms_btn.stateChanged.connect(self.WhenmsChecked)
             self.swaptomV_btn = QtGui.QCheckBox('mV?')
             self.swaptomV_btn.stateChanged.connect(self.WhenmVChecked)
+            
+            #test to see if I can get an error message to display
+            #self.errordetailtest = QtGui.QLabel('error details here')
     
     
             #buttons at the top
@@ -242,6 +245,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             
             self.w1.addWidget(self.blankspace, row = 14, col= 0, colspan= 4) #this is literally just to help with the spacing
             
+           # self.w1.addWidget(self.errordetailtest, row = 15, col=0)
           
             self.d1.addWidget(self.w1, row=0, col=0)
            # self.d1.addWidget(self.w2, row=0, col=2)
@@ -349,9 +353,15 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             arduino.close()
             print('port closed in talking')
         except (OSError, serial.SerialException):
-            self.general_things.errordetails.setText('whoops the arduino is not there')
-            print('whoops the arduino is not there') 
             #this line isn't doing what it's supposed to :(
+            print(self.general_things.errordetails.text())
+            #self.errordetailtest.setText('whoops the arduino is not there TEST')
+            #self.general_things.errordetails.setText('whoops the arduino is not there UPKEEP')
+            print(self.general_things.errordetails.text())
+            print(self.errordetailtest.text())
+            #upkeep.Upkeep.errordetails.setText('whoops the arduino is not there')
+            print('whoops the arduino is not there') 
+            
             
  
     
@@ -478,10 +488,8 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         #this occurs when enter pressed in this LE
         
         #want to send the new value to arduino
-        #PUT THIS IN LATER
-        #for now, update the internal value myself
-        self.cavPgain = self.cavPgainLE.text()
-        #print(self.cavPgain)
+        self.WritetoArduino('a', self.cavPgainLE.text())
+
         #change colour to alert to an edit
         self.cavPgainLE.setStyleSheet("border: 1px solid black; background-color : lightsalmon")
         
@@ -489,10 +497,8 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         #this occurs when enter pressed in this LE
         
         #want to send the new value to arduino
-        #PUT THIS IN LATER
-        #for now, update the internal value myself
-        self.cavIgain = self.cavIgainLE.text()
-        #print(self.cavPgain)
+        self.WritetoArduino('b', self.cavIgainLE.text())
+        
         #change colour to alert to an edit
         self.cavIgainLE.setStyleSheet("border: 1px solid black; background-color : lightsalmon")
         
@@ -500,10 +506,8 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         #this occurs when enter pressed in this LE
         
         #want to send the new value to arduino
-        #PUT THIS IN LATER
-        #for now, update the internal value myself
-        self.laserPgain = self.laserPgainLE.text()
-        #print(self.cavPgain)
+        self.WritetoArduino('c', self.laserPgainLE.text())
+        
         #change colour to alert to an edit
         self.laserPgainLE.setStyleSheet("border: 1px solid black; background-color : lightsalmon")
         
@@ -511,10 +515,8 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         #this occurs when enter pressed in this LE
         
         #want to send the new value to arduino
-        #PUT THIS IN LATER
-        #for now, update the internal value myself
-        self.laserIgain = self.laserIgainLE.text()
-        #print(self.cavPgain)
+        self.WritetoArduino('d', self.laserIgainLE.text())
+        
         #change colour to alert to an edit
         self.laserIgainLE.setStyleSheet("border: 1px solid black; background-color : lightsalmon")
     
@@ -522,10 +524,8 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         #this occurs when enter pressed in this LE
         
         #want to send the new value to arduino
-        #PUT THIS IN LATER
-        #for now, update the internal value myself
-        self.laserDgain = self.laserDgainLE.text()
-        #print(self.cavPgain)
+        self.WritetoArduino('k', self.laserDgainLE.text())
+        
         #change colour to alert to an edit
         self.laserDgainLE.setStyleSheet("border: 1px solid black; background-color : lightsalmon")
         
@@ -535,8 +535,9 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         #want to send the new value to arduino
         #PUT THIS IN LATER
         #for now, update the internal value myself
-        self.laserfreqsetpoint = self.tempstorageLFSP#self.laserfreqsetpointLE.text()
-        print(self.laserfreqsetpoint)
+        #self.laserfreqsetpoint = self.tempstorageLFSP#self.laserfreqsetpointLE.text()
+        #print(self.laserfreqsetpoint)
+        self.WritetoArduino('e', self.tempstorageLFSP)
         #change colour to alert to an edit
         self.laserfreqsetpointLE.setStyleSheet("border: 1px solid black; background-color : lightsalmon")
         
@@ -546,8 +547,9 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         #want to send the new value to arduino
         #PUT THIS IN LATER
         #for now, update the internal value myself
-        self.cavoffsetpoint = self.tempstorageCOSP#self.cavoffsetpointLE.text()
+        #self.cavoffsetpoint = self.tempstorageCOSP#self.cavoffsetpointLE.text()
         #print(self.cavPgain)
+        self.WritetoArduino('i', self.tempstorageCOSP)
         #change colour to alert to an edit
         self.cavoffsetpointLE.setStyleSheet("border: 1px solid black; background-color : lightsalmon")
     
@@ -556,10 +558,8 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         #this occurs when enter pressed in this LE
         
         #want to send the new value to arduino
-        #PUT THIS IN LATER
-        #for now, update the internal value myself
-        self.highthreshold = self.highthresholdLE.text()
-        #print(self.cavPgain)
+        self.WritetoArduino('g', self.highthresholdLE.text())
+        
         #change colour to alert to an edit
         self.highthresholdLE.setStyleSheet("border: 1px solid black; background-color : lightsalmon")
     
@@ -568,9 +568,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         #this occurs when enter pressed in this LE
         
         #want to send the new value to arduino
-        #PUT THIS IN LATER
-        #for now, update the internal value myself
-        self.lowthreshold = self.lowthresholdLE.text()
+        self.WritetoArduino('f', self.lowthresholdLE.text())
         
         #change colour to alert to an edit
         self.lowthresholdLE.setStyleSheet("border: 1px solid black; background-color : lightsalmon")
@@ -634,3 +632,25 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         else:
             self.label_highthresholdLE.setStyleSheet("color : black")
             self.label_lowthresholdLE.setStyleSheet("color : black")
+            
+            
+            
+    def WritetoArduino(self, key, value):
+        #key here should specify which value you're trying to send to arduino
+        #value is the new value you want to send 
+        
+        comport = self.general_things.parameter_loop_comboBox.currentText()
+        
+        message = 'm' + str(key) + str(value) + '!' #encode given data into a message the arduino can understand
+        print(f'message is {message}')
+        try:
+            arduino = serial.Serial(comport, self.baudrate, timeout=.1)#should hopefully open the serial communication?
+            print('COM port open in talking')
+            
+            #
+            arduino.write(str.encode(message)) #send this message to the arduino, activates the message_parser function
+            
+            arduino.close()
+            print('port closed in talking')
+        except (OSError, serial.SerialException):
+            print('whoops the arduino is not there') 
