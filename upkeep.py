@@ -126,7 +126,9 @@ class Upkeep(QtGui.QMainWindow):
 
             self.w3 = pg.LayoutWidget()
             self.lock_btn = QtGui.QPushButton('Lock')
-            self.lock_btn.setStyleSheet(':closed { background: green , border:none}')   
+            self.lock_btn.setCheckable(True)
+            self.lock_btn.setStyleSheet(':checked { color: green; background: palegreen }')  
+            self.lock_btn.pressed.connect(self.LockBtn)
             self.save_values_checkbox = QtGui.QCheckBox("Save?")
             
             self.w3.addWidget(self.lock_btn, row=0, col=0)
@@ -211,8 +213,34 @@ class Upkeep(QtGui.QMainWindow):
             print('port closed in talking')
         except (OSError, serial.SerialException):
             print('whoops the arduino is not there')
+            
+            
+     
+    def LockBtn(self):
+        #set the bump variable to low/high depending on what we want to do
+        comport = self.parameter_loop_comboBox.currentText()
+        if self.lock_btn.isChecked():
+            #ie if button is unpressed - no lock
+            print(f'no lock: {self.lock_btn.isChecked()}')
+            try:
+                arduino = serial.Serial(comport, self.baudrate, timeout=.1) #should hopefully open the serial communication?
+                arduino.write(str.encode('mh0!'))
+                
+                arduino.close()
 
-    
+            except (OSError, serial.SerialException):
+                print('whoops the arduino is not there')
+        else:
+            #button pressed- lock engaged
+            print(f'thats a lock folks: {self.lock_btn.isChecked()}')
+            try:
+                arduino = serial.Serial(comport, self.baudrate, timeout=.1) #should hopefully open the serial communication?
+                arduino.write(str.encode('mh1!'))
+                
+                arduino.close()
+
+            except (OSError, serial.SerialException):
+                print('whoops the arduino is not there')
 
       
 

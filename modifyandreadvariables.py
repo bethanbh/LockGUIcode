@@ -65,6 +65,9 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         self.tempstorageLFSP = 10 
         self.tempstorageCOSP = 13
         
+        self.tempstorageHT = 100
+        self.tempstorageLT = 130
+        
         self.baudrate = 230400
         
         self.general_things = upkeep.Upkeep(self)
@@ -171,12 +174,14 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             
             self.highthresholdLE = QtGui.QLineEdit(str(self.highthreshold))
             self.highthresholdLE.returnPressed.connect(self.highthresholdChangeText)
+            self.highthresholdLE.textEdited.connect(self.TextEditmVUnitSortOut)
             self.label_highthresholdLE = QtGui.QLabel('High threshold')
             self.highthresholdvalue = QtGui.QLineEdit(str(self.highthreshold))
             self.highthresholdvalue.setStyleSheet("border: 1px solid black")
             
             self.lowthresholdLE = QtGui.QLineEdit(str(self.lowthreshold))
             self.lowthresholdLE.returnPressed.connect(self.lowthresholdChangeText)
+            self.lowthresholdLE.textEdited.connect(self.TextEditmVUnitSortOut)
             self.label_lowthresholdLE = QtGui.QLabel('Low threshold')
             self.lowthresholdvalue = QtGui.QLabel(str(self.lowthreshold))
             self.lowthresholdvalue.setStyleSheet("border: 1px solid black")
@@ -260,6 +265,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         #not sure whether I should just commit to storing them as a dictionary normally?
         dict = {}
         dict['cavPgain'] = self.cavPgain
+        #dict['lowthreshold'] = self.lowthreshold
         dict['cavIgain'] = self.cavIgain
         dict['laserPgain'] = self.laserPgain
         dict['laserIgain'] = self.laserIgain
@@ -276,7 +282,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
 
     def SaveParameters(self): #this will happen after the talking to the arduino bit, and updating the values- so the dict part should be actively saving the new values
         #want this to happen when you click the button, and also when you press lock if the box is checked
-        dict = self.GenerateParamDict()  #saves the values in arduino units, not ms/mV
+        dict = self.GenerateParamDict()  #saves the values in arduino units, not ms or mV
 
         #then need to actually save the parameters
         param_file = QtGui.QFileDialog.getSaveFileName(self, 'Save Params', DIR_PARAMS) 
@@ -292,7 +298,9 @@ class ModifyandRead_variable(QtGui.QMainWindow):
                     msg += str(dict[key])
                     msg += '\n'
                     f.write(msg)
+                    print(f'saving this: {msg}')
             f.close()
+        print(dict)
  
 
     def TalktoArduino(self):
@@ -386,8 +394,14 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         else:
             self.laserfreqsetpointvalue.setText(str(round(float(self.laserfreqsetpoint),3)))
             self.cavoffsetpointvalue.setText(str(round(float(self.cavoffsetpoint),3)))
-        self.highthresholdvalue.setText(str(round(float(self.highthreshold),3)))
-        self.lowthresholdvalue.setText(str(round(float(self.lowthreshold),3)))
+        if self.swaptomV_btn.isChecked():
+            self.highthresholdMS = float(self.highthreshold)/100
+            self.highthresholdvalue.setText(str(round(self.highthresholdMS,3)))
+            self.lowthresholdMS = float(self.lowthreshold)/100
+            self.lowthresholdvalue.setText(str(round(self.lowthresholdMS,3)))
+        else:
+            self.highthresholdvalue.setText(str(round(float(self.highthreshold),3)))
+            self.lowthresholdvalue.setText(str(round(float(self.lowthreshold),3)))
         
         
         #Then give the option to save if the save values is checked
@@ -425,37 +439,50 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         dict = {}
     
         param_file = QtGui.QFileDialog.getOpenFileName(self, 'Open file',DIR_PARAMS)
+        #print(f'param_file is {param_file}')
         
         #this part is just writing the parameters into an empty dictionary, dict
         with open(param_file[0] ,'r') as f:
+            
             for line in f :
-                #strip() removes the \n, split('\t') return a list whose elements where separated by a \t
-                line = line.strip().split('\t')
-                key = line[0]
-                word = float(line[1])
-                dict[key] = word
+                if len(line) == 1:
+                    pass
+                else:
+                    #strip() removes the \n, split('\t') return a list whose elements where separated by a \t
+                    line = line.strip().split('\t')
+                    key = line[0]
+                    word = float(line[1])
+                    dict[key] = word
         f.close()
         
-        #print('yup')
+
         
         #now want to send these new values to arduino
-        #PUT THIS IN LATER
+        self.WritetoArduino('a', dict['cavPgain'])
+        self.WritetoArduino('b', dict['cavIgain'])
+        self.WritetoArduino('c', dict['laserPgain'])
+        self.WritetoArduino('d', dict['laserIgain'])
+        self.WritetoArduino('k', dict['laserDgain'])
+        self.WritetoArduino('e', dict['laserfreqsetpoint'])
+        self.WritetoArduino('i', dict['cavoffsetpoint'])
+        self.WritetoArduino('g', dict['highthreshold'])
+        self.WritetoArduino('f', dict['lowthreshold'])
         
         #for now, update the internal values directly instead
-        self.cavPgain = dict['cavPgain']
-        self.cavIgain = dict['cavIgain']
-        self.laserPgain = dict['laserPgain']
-        self.laserIgain = dict['laserIgain'] 
-        self.laserDgain = dict['laserDgain']
-        self.laserfreqsetpoint = dict['laserfreqsetpoint']
-        self.cavoffsetpoint = dict['cavoffsetpoint']
-        self.highthreshold = dict['highthreshold']
-        self.lowthreshold = dict['lowthreshold']
+       # self.cavPgain = dict['cavPgain']
+       # self.cavIgain = dict['cavIgain']
+       # self.laserPgain = dict['laserPgain']
+       # self.laserIgain = dict['laserIgain'] 
+       # self.laserDgain = dict['laserDgain']
+       # self.laserfreqsetpoint = dict['laserfreqsetpoint']
+        #self.cavoffsetpoint = dict['cavoffsetpoint']
+       # self.highthreshold = dict['highthreshold']
+       # self.lowthreshold = dict['lowthreshold']
         print(f'Loaded parameters from {param_file[0]}')
         
         #then update what's displayed in the write boxes with the values from the file
         #this doesn't really do anything, just to show you what you've loaded- the update to arduino section previous should do all the important stuff
-        print(f'What should be in the box = {str(dict["cavPgain"])}')
+        
         self.cavPgainLE.setText(str(dict['cavPgain']))
         self.cavIgainLE.setText(str(dict['cavIgain']))
         self.laserPgainLE.setText(str(dict['laserPgain']))
@@ -467,8 +494,12 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         else:
             self.laserfreqsetpointLE.setText(str(dict['laserfreqsetpoint']))
             self.cavoffsetpointLE.setText(str(dict['cavoffsetpoint']))
-        self.highthresholdLE.setText(str(dict['highthreshold']))
-        self.lowthresholdLE.setText(str(dict['lowthreshold']))
+        if self.swaptomV_btn.isChecked(): #display in mV (won't send to arduino in mV)
+            self.highthresholdLE.setText(str(np.round(dict['highthreshold']/100,4)))
+            self.lowthresholdLE.setText(str(np.round(dict['lowthreshold']/100,4)))
+        else:
+            self.highthresholdLE.setText(str(dict['highthreshold']))
+            self.lowthresholdLE.setText(str(dict['lowthreshold']))
         
         #then change colour of write boxes to show that there's been an update that hasn't been transferred to the read boxes
         #should then press read values to pull the now updated values from the arduino directly into the read boxes
@@ -545,10 +576,6 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         #this occurs when enter pressed in this LE
         
         #want to send the new value to arduino
-        #PUT THIS IN LATER
-        #for now, update the internal value myself
-        #self.cavoffsetpoint = self.tempstorageCOSP#self.cavoffsetpointLE.text()
-        #print(self.cavPgain)
         self.WritetoArduino('i', self.tempstorageCOSP)
         #change colour to alert to an edit
         self.cavoffsetpointLE.setStyleSheet("border: 1px solid black; background-color : lightsalmon")
@@ -558,7 +585,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         #this occurs when enter pressed in this LE
         
         #want to send the new value to arduino
-        self.WritetoArduino('g', self.highthresholdLE.text())
+        self.WritetoArduino('g', self.tempstorageHT)
         
         #change colour to alert to an edit
         self.highthresholdLE.setStyleSheet("border: 1px solid black; background-color : lightsalmon")
@@ -568,7 +595,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         #this occurs when enter pressed in this LE
         
         #want to send the new value to arduino
-        self.WritetoArduino('f', self.lowthresholdLE.text())
+        self.WritetoArduino('f', self.tempstorageLT)
         
         #change colour to alert to an edit
         self.lowthresholdLE.setStyleSheet("border: 1px solid black; background-color : lightsalmon")
@@ -622,6 +649,19 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             #we're writing in AU
             self.tempstorageLFSP = self.laserfreqsetpointLE.text()
             self.tempstorageCOSP = self.cavoffsetpointLE.text()
+            
+    def TextEditmVUnitSortOut(self):
+        if self.swaptomV_btn.isChecked():
+            #then we're writing in ms
+            placeholder = self.highthresholdLE.text()
+            self.tempstorageHT = float(placeholder)*100
+            placeholder2 = self.lowthresholdLE.text()
+            self.tempstorageLT = float(placeholder2)*100
+        else:
+            #we're writing in AU
+            self.tempstorageHT = self.highthresholdLE.text()
+            self.tempstorageLT = self.lowthresholdLE.text()
+        
         
     def WhenmVChecked(self):
         #this occurs when the mV swap units box is checked
@@ -629,9 +669,36 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         if self.swaptomV_btn.isChecked():
             self.label_highthresholdLE.setStyleSheet("color : deeppink")
             self.label_lowthresholdLE.setStyleSheet("color : deeppink")
+            
+            #change the units that things are displayed in:
+            #read boxes
+            self.highthresholdMS = float(self.highthreshold)/100
+            self.highthresholdvalue.setText(str(np.round(self.highthresholdMS,3)))
+            #write box
+            self.tempstorageHT = self.highthresholdLE.text()
+            HTinms = float(self.tempstorageHT)/100
+            self.highthresholdLE.setText(str(np.round(HTinms,3)))
+           
+            #read boxes
+            self.lowthresholdMS = float(self.lowthreshold)/100
+            self.lowthresholdvalue.setText(str(np.round(self.lowthresholdMS,3)))
+            #write box
+            self.tempstorageLT = self.lowthresholdLE.text()
+            LTinms = float(self.tempstorageLT)/100
+            self.lowthresholdLE.setText(str(np.round(LTinms,3)))
+            
+                
         else:
-            self.label_highthresholdLE.setStyleSheet("color : black")
             self.label_lowthresholdLE.setStyleSheet("color : black")
+            self.label_highthresholdLE.setStyleSheet("color : black")
+            
+            #read boxes
+            self.highthresholdvalue.setText(str(np.round(float(self.highthreshold),3)))
+            self.lowthresholdvalue.setText(str(np.round(float(self.lowthreshold),3)))
+        
+            #write box
+            self.highthresholdLE.setText(str(np.round(float(self.tempstorageHT),3)))
+            self.lowthresholdLE.setText(str(np.round(float(self.tempstorageLT),3)))
             
             
             
@@ -642,15 +709,15 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         comport = self.general_things.parameter_loop_comboBox.currentText()
         
         message = 'm' + str(key) + str(value) + '!' #encode given data into a message the arduino can understand
-        print(f'message is {message}')
+        #print(f'message is {message}')
         try:
             arduino = serial.Serial(comport, self.baudrate, timeout=.1)#should hopefully open the serial communication?
-            print('COM port open in talking')
+            #print('COM port open in talking')
             
             #
             arduino.write(str.encode(message)) #send this message to the arduino, activates the message_parser function
             
             arduino.close()
-            print('port closed in talking')
+            #print('port closed in talking')
         except (OSError, serial.SerialException):
             print('whoops the arduino is not there') 

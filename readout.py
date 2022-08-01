@@ -222,13 +222,14 @@ class Readout(QtGui.QMainWindow):
             #get laser error
             arduino.write(str.encode('pl!'))
             currentlasererror = arduino.readline()
-            self.currentlasererror = currentlasererror.decode()
+            self.currentlasererror = currentlasererror.decode().strip()
+
         
             
             #get cavity error
             arduino.write(str.encode('pm!'))
             currentcaverror = arduino.readline()
-            self.currentcaverror = currentcaverror.decode()
+            self.currentcaverror = currentcaverror.decode().strip()
             
             arduino.close()
             print('port closed in talking')
