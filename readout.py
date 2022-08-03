@@ -20,6 +20,7 @@ import time
 import serial
 
 import upkeep
+import random
 
 from PyQt5.QtGui import QFont
 
@@ -86,6 +87,8 @@ class Readout(QtGui.QMainWindow):
             
             self.read_peakpos_btn = QtGui.QPushButton('Peaks?')
             self.read_peakpos_btn.clicked.connect(self.WhenPeakPosBtnPressed)
+            #self.read_peakpos_btn.clicked.connect(self.newPeakPos)
+            self.read_peakpos_btn.clicked.connect(self.PlotPeaks)
             self.read_peakpos_btn.setStyleSheet(':hover { background: powderblue }')
             self.unit_swapcheckbox = QtGui.QCheckBox('ms?')
             
@@ -99,6 +102,7 @@ class Readout(QtGui.QMainWindow):
             self.peak1posvalue.setAlignment(QtCore.Qt.AlignCenter)
             self.peak2posvalue.setAlignment(QtCore.Qt.AlignCenter)
             self.peak3posvalue.setAlignment(QtCore.Qt.AlignCenter)
+            
 
             self.w1.addWidget(self.read_peakpos_btn, row=0, col=0)
             self.w1.addWidget(self.unit_swapcheckbox, row=1, col=0)
@@ -108,6 +112,27 @@ class Readout(QtGui.QMainWindow):
             self.w1.addWidget(self.peak1posvalue, row=1, col=1)
             self.w1.addWidget(self.peak2posvalue, row=1, col=2)
             self.w1.addWidget(self.peak3posvalue, row=1, col=3)
+            
+            #######################################################################
+            ## w5:buttons to choose what to display
+            #######################################################################
+            self.w5 = pg.LayoutWidget()
+            
+            self.peakposbtn = QtGui.QPushButton('Peak pos')
+            self.peakposbtn.setCheckable(True)
+            self.peakposbtn.setStyleSheet(':checked { color: salmon; background: #ffc9de }')
+            #self.peakposbtn.clicked.connect(self.ShowPeakPos)
+            self.peaktrackerbtn = QtGui.QPushButton('Peak tracker')
+            self.peaktrackerbtn.setCheckable(True)
+            self.peaktrackerbtn.setStyleSheet(':checked { color: orange; background: #fdd97c }') 
+            self.errortrackerbtn = QtGui.QPushButton('Error tracker')
+            self.errortrackerbtn.setCheckable(True)
+            self.errortrackerbtn.setStyleSheet(':checked { color: mediumorchid; background: thistle }') 
+            
+            
+            self.w5.addWidget(self.peakposbtn,row=0, col=1)
+            self.w5.addWidget(self.peaktrackerbtn, row=0, col=2)
+            self.w5.addWidget(self.errortrackerbtn, row=0, col=3)
 
             #######################################################################
             ## w2:graph of peak positions
@@ -116,13 +141,53 @@ class Readout(QtGui.QMainWindow):
       
             self.w2 = pg.LayoutWidget()
 
-            self.fig_peakpos = plt.figure(facecolor='white', frameon = True, figsize=(8,2))
-            self.canvas_peakpos = FigureCanvas(self.fig_peakpos)
-    #        self.ax_pulses = self.fig_pulses.add_subplot(1,1,1)
-    #
-    #        self.ax_pulses.plot(10,10,s=200,c='g',alpha=.8)
+            #self.fig_peakpos = plt.figure(facecolor='ghostwhite', frameon = True, figsize=(10,3))
+            #self.fig_peakpos.subplots_adjust(bottom=0.3)
+            #self.canvas_peakpos = FigureCanvas(self.fig_peakpos)
+            #self.ax_peaks = self.fig_peakpos.add_subplot(1,1,1)
+            #self.ax_peaks.set_xlabel("Peak position (AU)")
+            #self.ax_peaks.tick_params(left = False, labelleft=False)
+            
+            #self.ax_peaks.axvline(x=6, ymin=0, ymax=1, color='k')
+            # a figure instance to plot on
+            self.figure = plt.figure(facecolor='ghostwhite', frameon = True, figsize=(10,2))
+            
+            self.canvas = FigureCanvas(self.figure)
+            
+            #self.ax_pulses = self.fig_pulses.add_subplot(1,1,1)
+    
+            #self.ax_pulses.plot(10,10,s=200,c='g',alpha=.8)
+    
+            '''#try using pyqtgraph
+            pg.setConfigOption('background', 'w')
+            #pg.setConfigOption('foreground', 'k')
 
-            self.w2.addWidget(self.canvas_peakpos, row=0, col=0)
+            self.canvas_peakpos = pg.plot()#PlotWidget()
+            self.canvas_peakpos.setLabel('bottom', text='Peak position', units='s')
+            self.canvas_peakpos.showAxis('left', show=False)
+            #self.canvas_peakpos.setXRange(0, 50, padding=2)
+            self.canvas_peakpos.setYRange(0, 2, padding=2)
+           
+            #self.canvas_peakpos.setVisibleRange()
+            self._add_padding_to_plot_widget(self.canvas_peakpos)
+            
+            
+             #trying to use pyqtgraph stuff but failing                                       
+            self.view = pg.GraphicsView()                                                            
+            self.l = pg.GraphicsLayout(border='g')                                                   
+            self.view.setCentralItem(self.l)                                                              
+            self.view.show()                                                                         
+            self.view.resize(0.3,0.1)                                                                
+            
+            self.l.addPlot(0, 0)                                                                     
+                                                                                
+            
+            self.l.layout.setSpacing(0.)                                                             
+            self.l.setContentsMargins(1, 1, 1, 1)  '''   
+            
+                
+            self.w2.addWidget(self.canvas, row=0, col=0)
+            
             
             #######################################################################
             ## w2: graph of peak pos over time 
@@ -158,11 +223,13 @@ class Readout(QtGui.QMainWindow):
         
       
             self.d1.addWidget(self.w1, row=0, col=0)
-            self.d1.addWidget(self.w2, row=1, col=0)
-            self.d1.addWidget(self.w3, row=2, col=0)
-            self.d1.addWidget(self.w4, row=3, col=0)
+            self.d1.addWidget(self.w2, row=2, col=0)
+            self.d1.addWidget(self.w5, row=1, col=0)
+            self.d1.addWidget(self.w3, row=3, col=0)
+            self.d1.addWidget(self.w4, row=4, col=0)
             
             
+ 
             
             
     def ExtractPeakPos(self):
@@ -245,7 +312,79 @@ class Readout(QtGui.QMainWindow):
         self.cav_error.setText(str(self.currentcaverror))
         
         
+    def PlotPeaks(self):
+        self.ExtractPeakPos()
         
-            
+		# clearing old figure
+        self.figure.clear()
         
+		# create an axis
+        ax = self.figure.add_subplot(111)#, position=[0.15, 0.45, 0.75, 0.1])
+        #self.figure.subplots_adjust(left=0.05, right=0.05, top=0.8, bottom=0.8)
+        self.figure.subplots_adjust(0.05, 0.4, 0.95, 0.95) # left,bottom,right,top 
+        ax.tick_params(left = False, labelleft=False)
+
+		# plot data
+        #ax.plot(data, '*-')
+        if self.unit_swapcheckbox.isChecked():
+            ax.set_xlabel("Peak position (ms)")
+            ax.axvline(x=float(self.peak1pos)/84000, ymin=0, ymax= 1)
+            ax.axvline(x=float(self.peak2pos)/84000, ymin=0, ymax= 1)
+            ax.axvline(x=float(self.peak3pos)/84000, ymin=0, ymax= 1)
+        else:
+            ax.set_xlabel("Peak position (AU)")
+            ax.axvline(x=self.peak1pos, ymin=0, ymax= 1)
+            ax.axvline(x=self.peak2pos, ymin=0, ymax= 1)
+            ax.axvline(x=self.peak3pos, ymin=0, ymax= 1)
             
+
+		# refresh canvas
+        self.canvas.draw()
+        '''
+        self.canvas_peakpos.hide()
+        self.canvas_peakpos.figure.clf() #clears the figure
+        self.ax_peaks = self.fig_peakpos.add_subplot(1,1,1)
+        self.ax_peaks.tick_params(left = False, labelleft=False)
+    
+        
+      
+        
+        if self.unit_swapcheckbox.isChecked():
+            print('yep plot with ms')
+            self.ax_peaks.set_xlabel("Peak position (ms)")
+            self.ax_peaks.axvline(x=float(self.peak1pos)/84000, ymin=0, ymax=1, color='k')   
+            self.ax_peaks.axvline(x=float(self.peak2pos)/84000, ymin=0, ymax=1, color='k')   
+            self.ax_peaks.axvline(x=float(self.peak3pos)/84000, ymin=0, ymax=1, color='k')
+            print(f'{float(self.peak1pos)/84000}, {float(self.peak2pos)/84000}, {float(self.peak3pos)/84000}')
+           # fig.show()
+            self.canvas_peakpos.setVisible(True)
+        else:
+            print('cool plot in AU')
+            self.ax_peaks.set_xlabel("Peak position (AU)")
+            self.ax_peaks.axvline(x=self.peak1pos, ymin=0, ymax=1, color='k')   
+            self.ax_peaks.axvline(x=self.peak2pos, ymin=0, ymax=1, color='k')   
+            self.ax_peaks.axvline(x=self.peak3pos, ymin=0, ymax=1, color='k') 
+            print(f'{float(self.peak1pos)}, {float(self.peak2pos)}, {float(self.peak3pos)}')
+            #fig.show()
+            self.canvas_peakpos.setVisible(True)
+        #need to fix the x limits so the peaks move relative to a fixed scale
+        print('were trying to plot peaks')'''
+        
+    
+    def newPeakPos(self):
+        print('new function attempt')
+        self.canvas_peakpos.hide()
+        self.canvas_peakpos.figure.clf()
+        #self.fig_peakpos.subplots_adjust(bottom=0.3)
+        #self.time_resolution = int(self.time_resolution_LE.text())
+        #add_time = 0.05 * self.t_max
+        self.ax_peakpos = self.fig_peakpos.add_subplot(1,1,1)
+        self.ax_peakpos.set_xlabel("Peak Position (ms)")
+        self.canvas_peakpos.setVisible(True)
+    
+    def ShowPeakPos(self):
+        
+        if self.peakposbtn.isChecked():
+            pass#self.canvas_peakpos.setVisible(True)
+        else:
+            pass#self.canvas_peakpos.hide()
