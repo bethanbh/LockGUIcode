@@ -129,30 +129,6 @@ class Readout(QtGui.QMainWindow):
 
     def initUI(self):
         #AWG
-        self.cavPgain = 9
-        self.cavIgain = 2
-        self.laserPgain = 3
-        self.laserIgain = 4
-        self.laserDgain = 5
-        self.laserfreqsetpoint = 6
-        self.cavoffsetpoint = 7
-        self.highthreshold = 8
-        self.lowthreshold = 9
-        
-        self.laserfreqsetpointMS = 0.6
-        self.cavoffsetpointMS = 0.7
-        self.highthresholdMV = 0.8
-        self.lowthresholdMV = 0.9
-        
-        self.tempstorageLFSP = 10 
-        self.tempstorageCOSP = 13
-        
-        self.tempstorageHT = 100
-        self.tempstorageLT = 130
-        
-        self.baudrate = 230400
-        
-        self.general_things = upkeep.Upkeep(self)
         self.examplefilename = 'example filename'
         self.peak1pos = 100
         self.peak2pos = 200
@@ -196,158 +172,6 @@ class Readout(QtGui.QMainWindow):
             
             
             self.area.addDock(self.d1, 'left')
-            
-            
-            #######################################################################
-            ## w1: modify variables
-            #######################################################################
-    
-            self.w0 = pg.LayoutWidget()
-            self.label_w0 = QtGui.QLabel('Locking parameters')
-            self.label_w0.setFont(QFont('Helvetica', 10))
-            self.label_w0.setAlignment(QtCore.Qt.AlignCenter)
-            
-            #button to load values from a file
-            self.load_files_btn = QtGui.QPushButton('Load parameters')
-            #self.load_files_btn.clicked.connect(self.LoadParameters)
-            self.load_files_btn.setStyleSheet(':hover { background: aquamarine }')
-            #button to read the values and update them
-            self.read_values_btn = QtGui.QPushButton('Values?')
-            #self.read_values_btn.clicked.connect(self.WhenValuesBtnPress)
-            self.read_values_btn.setStyleSheet(':hover { background: lightpink }')
-            #checkbox to see if you want to save the parameters
-            self.save_params_checkbox = QtGui.QCheckBox('Save parameters?')
-    
-            
-            #creating the boxes to put the values in
-            self.cavPgainLE = QtGui.QLineEdit(str(self.cavPgain))
-            #self.cavPgainLE.returnPressed.connect(self.cavPgainChangeText)
-            self.label_cavPgainLE = QtGui.QLabel('Cavity P gain')
-            self.cavPgainvalue = QtGui.QLabel(str(self.cavPgain))
-            self.cavPgainvalue.setStyleSheet("border: 1px solid black")
-            
-            self.cavIgainLE = QtGui.QLineEdit(str(self.cavIgain))
-            #self.cavIgainLE.returnPressed.connect(self.cavIgainChangeText)
-            self.label_cavIgainLE = QtGui.QLabel('Cavity I gain')
-            self.cavIgainvalue = QtGui.QLabel(str(self.cavIgain))
-            self.cavIgainvalue.setStyleSheet("border: 1px solid black")
-            
-            self.laserPgainLE = QtGui.QLineEdit(str(self.laserPgain))
-            #self.laserPgainLE.returnPressed.connect(self.laserPgainChangeText)
-            self.label_laserPgainLE = QtGui.QLabel('Laser P gain')
-            self.laserPgainvalue = QtGui.QLabel(str(self.laserPgain))
-            self.laserPgainvalue.setStyleSheet("border: 1px solid black")
-            
-            self.laserIgainLE = QtGui.QLineEdit(str(self.laserIgain))
-            #self.laserIgainLE.returnPressed.connect(self.laserIgainChangeText)
-            self.label_laserIgainLE = QtGui.QLabel('Laser I gain')
-            self.laserIgainvalue = QtGui.QLabel(str(self.laserIgain))
-            self.laserIgainvalue.setStyleSheet("border: 1px solid black")
-            
-            self.laserDgainLE = QtGui.QLineEdit(str(self.laserDgain))
-            #self.laserDgainLE.returnPressed.connect(self.laserDgainChangeText)
-            self.label_laserDgainLE = QtGui.QLabel('Laser D gain')
-            self.laserDgainvalue = QtGui.QLabel(str(self.laserDgain))
-            self.laserDgainvalue.setStyleSheet("border: 1px solid black")
-            
-            self.laserfreqsetpointLE = QtGui.QLineEdit(str(self.laserfreqsetpoint))
-            #self.laserfreqsetpointLE.returnPressed.connect(self.laserfreqsetpointChangeText)
-            #self.laserfreqsetpointLE.textEdited.connect(self.TextEditmsUnitSortOut)
-            self.label_laserfreqsetpointLE = QtGui.QLabel('Laser setpoint')
-            self.laserfreqsetpointvalue = QtGui.QLabel(str(self.laserfreqsetpoint))
-            self.laserfreqsetpointvalue.setStyleSheet("border: 1px solid black")
-            
-            self.cavoffsetpointLE = QtGui.QLineEdit(str(self.cavoffsetpoint))
-            #self.cavoffsetpointLE.returnPressed.connect(self.cavoffsetpointChangeText)
-            #self.cavoffsetpointLE.textEdited.connect(self.TextEditmsUnitSortOut)
-            self.label_cavoffsetpointLE = QtGui.QLabel('Cavity setpoint')
-            self.cavoffsetpointvalue = QtGui.QLabel(str(self.cavoffsetpoint))
-            self.cavoffsetpointvalue.setStyleSheet("border: 1px solid black")
-            
-            self.highthresholdLE = QtGui.QLineEdit(str(self.highthreshold))
-            #self.highthresholdLE.returnPressed.connect(self.highthresholdChangeText)
-            #self.highthresholdLE.textEdited.connect(self.TextEditmVUnitSortOut)
-            self.label_highthresholdLE = QtGui.QLabel('High threshold')
-            self.highthresholdvalue = QtGui.QLineEdit(str(self.highthreshold))
-            self.highthresholdvalue.setStyleSheet("border: 1px solid black")
-            
-            self.lowthresholdLE = QtGui.QLineEdit(str(self.lowthreshold))
-            #self.lowthresholdLE.returnPressed.connect(self.lowthresholdChangeText)
-            #self.lowthresholdLE.textEdited.connect(self.TextEditmVUnitSortOut)
-            self.label_lowthresholdLE = QtGui.QLabel('Low threshold')
-            self.lowthresholdvalue = QtGui.QLabel(str(self.lowthreshold))
-            self.lowthresholdvalue.setStyleSheet("border: 1px solid black")
-            
-            self.blankspace= QtGui.QLabel('')
-            self.blankspace2= QtGui.QLabel('')
-            
-            self.saveparamsbtn = QtGui.QPushButton('Save parameters?')
-            self.saveparamsbtn.setStyleSheet(':hover { background: papayawhip }')
-    
-            self.swapunits_label= QtGui.QLabel('Swap units')
-            self.swaptoms_btn = QtGui.QCheckBox('ms?')
-            #self.swaptoms_btn.stateChanged.connect(self.WhenmsChecked)
-            self.swaptomV_btn = QtGui.QCheckBox('mV?')
-            #self.swaptomV_btn.stateChanged.connect(self.WhenmVChecked)
-            
-            #test to see if I can get an error message to display
-            #self.errordetailtest = QtGui.QLabel('error details here')
-    
-    
-            #buttons at the top
-            self.w0.addWidget(self.label_w0, row=0, col=0,colspan = 3)
-            self.w0.addWidget(self.load_files_btn, row = 1,col=0, colspan=3)
-            self.w0.addWidget(self.read_values_btn, row = 1, col= 3)
-            self.w0.addWidget(self.save_params_checkbox, row = 2, col= 1)
-            
-            #adding in line edit boxes
-            self.w0.addWidget(self.cavPgainLE, row = 3, col = 2)
-            self.w0.addWidget(self.cavIgainLE, row = 4, col = 2)
-            self.w0.addWidget(self.laserPgainLE, row = 5, col = 2)
-            self.w0.addWidget(self.laserIgainLE, row = 6, col = 2)
-            self.w0.addWidget(self.laserDgainLE, row = 7, col = 2)
-            self.w0.addWidget(self.laserfreqsetpointLE, row = 8, col = 2)
-            self.w0.addWidget(self.cavoffsetpointLE, row = 9, col = 2)
-            self.w0.addWidget(self.highthresholdLE, row = 10, col = 2)
-            self.w0.addWidget(self.lowthresholdLE, row = 11, col = 2)
-            #labels
-            self.w0.addWidget(self.label_cavPgainLE, row = 3, col = 1)
-            self.w0.addWidget(self.label_cavIgainLE, row = 4, col = 1)
-            self.w0.addWidget(self.label_laserPgainLE, row = 5, col = 1)
-            self.w0.addWidget(self.label_laserIgainLE, row = 6, col = 1)
-            self.w0.addWidget(self.label_laserDgainLE, row = 7, col = 1)
-            self.w0.addWidget(self.label_laserfreqsetpointLE, row = 8, col = 1)
-            self.w0.addWidget(self.label_cavoffsetpointLE, row = 9, col = 1)
-            self.w0.addWidget(self.label_highthresholdLE, row = 10, col = 1)
-            self.w0.addWidget(self.label_lowthresholdLE, row = 11, col = 1)
-            # values
-            self.w0.addWidget(self.cavPgainvalue, row = 3, col = 3)
-            self.w0.addWidget(self.cavIgainvalue, row = 4, col = 3)
-            self.w0.addWidget(self.laserPgainvalue, row = 5, col = 3)
-            self.w0.addWidget(self.laserIgainvalue, row = 6, col = 3)
-            self.w0.addWidget(self.laserDgainvalue, row = 7, col = 3)
-            self.w0.addWidget(self.laserfreqsetpointvalue, row = 8, col = 3)
-            self.w0.addWidget(self.cavoffsetpointvalue, row = 9, col = 3)
-            self.w0.addWidget(self.highthresholdvalue, row = 10, col = 3)
-            self.w0.addWidget(self.lowthresholdvalue, row = 11, col = 3)
-            
-            
-            self.w0.addWidget(self.blankspace2, row = 12, col= 0, colspan= 1) #this is literally just to help with the spacing
-            
-            self.w0.addWidget(self.swaptoms_btn, row = 13, col= 2, colspan= 1) #this is literally just to help with the spacing
-            
-            self.w0.addWidget(self.swaptomV_btn, row = 13, col= 3, colspan= 1) #this is literally just to help with the spacing
-            self.w0.addWidget(self.swapunits_label, row = 13, col= 1, colspan= 1) #this is literally just to help with the spacing
-          
-            
-            self.w0.addWidget(self.blankspace, row = 14, col= 0, colspan= 4) #this is literally just to help with the spacing
-            
-           # self.w1.addWidget(self.errordetailtest, row = 15, col=0)
-           
-           
-           
-            
-            
             
             #######################################################################
             ## w1: peak positions
@@ -469,7 +293,7 @@ class Readout(QtGui.QMainWindow):
             self.w3.addWidget(self.canvasEOT, row=0, col=0)
         
         
-            self.d1.addWidget(self.w0, row=0, col=1)
+        
       
             self.d1.addWidget(self.w1, row=0, col=0)
             self.d1.addWidget(self.w2, row=2, col=0)
