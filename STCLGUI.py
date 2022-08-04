@@ -16,6 +16,7 @@ import readvariables
 import upkeep
 import readout
 import serial
+import bigcombofile
 
 class schlagmuller_window(QtWidgets.QMainWindow):
     
@@ -46,7 +47,7 @@ class schlagmuller_window(QtWidgets.QMainWindow):
         #self.read_variables = readvariables.Read_variable(self)
         self.general_things = upkeep.Upkeep(self)
         self.readout = readout.Readout(self)
-
+        self.mainthings = bigcombofile.ModifyandRead_variable(self)
         
         #GUI
         self.area = dockarea.DockArea()
@@ -66,14 +67,14 @@ class schlagmuller_window(QtWidgets.QMainWindow):
         
     def createDocks(self):
         
-        self.d1 = self.modifyandread_variables.d1 #adding the modify variables bit (d1 is the actual window part)
+        self.d1 = self.mainthings.d1 #adding the modify variables bit (d1 is the actual window part)
         self.area.addDock(self.d1,'left')
         #self.d2 = self.read_variables.d1 #adding the read variables bit (d1 is the actual window part)
         #self.area.addDock(self.d2,'right', self.d1)
         self.d3 = self.general_things.d1 #adding the read variables bit (d1 is the actual window part)
         self.area.addDock(self.d3,'left', self.d1)
-        self.d4 = self.readout.d1 #adding the read variables bit (d1 is the actual window part)
-        self.area.addDock(self.d4,'right', self.d1)
+        #self.d4 = self.readout.d1 #adding the read variables bit (d1 is the actual window part)
+        #self.area.addDock(self.d4,'right', self.d1)
 
 
 
