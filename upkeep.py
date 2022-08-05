@@ -173,7 +173,7 @@ class Upkeep(QtGui.QMainWindow):
       
             self.d1.addWidget(self.w1, row=0, col=0)
             self.d1.addWidget(self.w2, row=1, col=0)
-            self.d1.addWidget(self.w3, row=2, col=0)
+            #self.d1.addWidget(self.w3, row=2, col=0)
             self.d1.addWidget(self.w4, row=4, col=0)
             self.d1.addWidget(self.w5, row=3, col=0)
             

@@ -47,9 +47,10 @@ class PeakPosTrackerThread(QtCore.QObject):
     #signals here- so like a finished one? there's also a progress one?
     updated = QtCore.pyqtSignal(list)
     readvalues = QtCore.pyqtSignal(list)
+    finished = QtCore.pyqtSignal()
     #time = QtCore.pyqtSignal(float)
     
-    def __init__(self, ctrl, readctrl, ctrllock):
+    def __init__(self, ctrl, readctrl, ctrllock, ctrlstop):
         QtCore.QThread.__init__(self)
         #ExpControl window is the parent
         #self.parent = parent
@@ -57,6 +58,7 @@ class PeakPosTrackerThread(QtCore.QObject):
         self.ctrl = ctrl
         self.readctrl = readctrl
         self.ctrllock = ctrllock
+        self.stopctrl = ctrlstop
         self.general_things = upkeep.Upkeep(self)
         comport = self.general_things.parameter_loop_comboBox.currentText()
         self.arduino = serial.Serial(comport, 230400, timeout=.1)#should hopefully open the serial communication?
@@ -65,6 +67,7 @@ class PeakPosTrackerThread(QtCore.QObject):
     def TASK(self):
         self.ctrl['break'] = False
         self.readctrl['break'] = False
+        self.stopctrl['break'] = False
     #long running task- ie want to talk to the arduino and update the peak positions
     #maybe everytime the peak positions are updated, it sends a signal which triggers the plotting function?
     #not sure whether this is gonna be worth it but there we go
@@ -184,10 +187,15 @@ class PeakPosTrackerThread(QtCore.QObject):
                         print('should be unlocked')
                     self.ctrllock['break'] = False
                     
+                if self.stopctrl['break']:
+                    
+                    print('finished loop bc flag raised')
+                    break                    
                             
             
             self.arduino.close()
             print('port closed in talking')
+            self.finished.emit()
         except (OSError, serial.SerialException):
             print('LOOP version whoops the arduino is not there')
 
@@ -242,6 +250,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         self.ctrl = {'break': False, 'value': '120', 'key': 'b'}
         self.readctrl = {'break':False, 'cPvalue': '12', 'cPkey': 'a', 'cIvalue':'13', 'cIkey':'b', 'lPvalue':'14', 'lPkey':'c', 'lIvalue':'14', 'lIkey':'d', 'lDvalue':'15', 'lDkey':'q', 'LFOSvalue':'16', 'LFOSkey':'e', 'COSvalue':'17', 'COSkey':'p', 'HTvalue':'18', 'HTkey':'k', 'LTvalue':'19', 'LTkey':'j'}
         self.ctrllock = {'break': False, 'value': 'placeholder'}
+        self.stopctrl = {'break': False}
         
         #self.t_max = 1000
         #self.time_resolution = 1
@@ -289,7 +298,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             self.lock_btn.setCheckable(True)
            # self.lock_btn.setStyleSheet(':unchecked {background-color: pink }')
             #self.lock_btn.setStyleSheet('{background-color: pink } :checked { color: green; background-color: palegreen }')  
-            self.lock_btn.setStyleSheet("QPushButton""{""background-color : pink;""}""QPushButton::checked""{""color:green; background-color : palegreen;""}")
+            self.lock_btn.setStyleSheet("QPushButton""{""background-color : lightblue;""}""QPushButton::checked""{""color:green; background-color : palegreen;""}")
                              
             self.lock_btn.pressed.connect(self.LockBtn)
             
@@ -507,19 +516,25 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             #######################################################################
             self.w5 = pg.LayoutWidget()
             
-            self.peakposbtn = QtGui.QPushButton('Peak pos')
-            self.peakposbtn.setCheckable(True)
-            self.peakposbtn.setStyleSheet(':checked { color: salmon; background: #ffc9de }')
+            self.STOPbtn = QtGui.QPushButton('STOP loop')
+            #self.peakposbtn.setCheckable(True)
+            #self.peakposbtn.setStyleSheet(':checked { color: salmon; background: #ffc9de }')
+            self.STOPbtn.setStyleSheet("QPushButton""{""background-color : tomato;""}")
+          #  self.lock_btn.setStyleSheet("QPushButton""{""background-color : azure;""}""QPushButton::checked""{""color:green; background-color : palegreen;""}")
+            self.STOPbtn.clicked.connect(self.StopTracker)
+            
+            
+            
            # self.peakposbtn.clicked.connect(self.ShowPeakPos)
             
-            self.peaktrackerbtn = QtGui.QPushButton('Peak tracker')
-            self.peaktrackerbtn.setCheckable(True)
-            self.peaktrackerbtn.setStyleSheet(':checked { color: orange; background: #fdd97c }') 
+            self.startloopbtn = QtGui.QPushButton('Start Loop')
+            self.startloopbtn.setCheckable(True)
+            self.startloopbtn.setStyleSheet(':checked { color: orange; background: #fdd97c }') 
             #self.peaktrackerbtn.clicked.connect(self.ShowPeakPosOverTime)
-            self.peaktrackerbtn.clicked.connect(self.UpdatePeakTracker)
+            self.startloopbtn.clicked.connect(self.UpdatePeakTracker)
             
             self.errortrackerbtn = QtGui.QPushButton('Error tracker')
-            #self.errortrackerbtn.setCheckable(True)
+            self.errortrackerbtn.setCheckable(True)
             self.errortrackerbtn.setStyleSheet(':checked { color: mediumorchid; background: thistle }') 
             #self.errortrackerbtn.clicked.connect(self.Break)
             #self.errortrackerbtn.clicked.connect(self.ShowErrorOverTime)
@@ -528,17 +543,24 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             self.filenametosave = QtGui.QLineEdit('example filename')
             self.filenametosave.returnPressed.connect(self.SetFilePathToSave)
             
+            self.peaktrackerbtn = QtGui.QPushButton('Peak Tracker')
+            self.peaktrackerbtn.setCheckable(True)
+            self.peaktrackerbtn.setStyleSheet(':checked { color: deeppink; background: pink }') 
+            
+            #self.plotreadouttoggle = QtGui.QCheckBox('Plot?')
+            
             #moved from above
             #if self.peakposbtn.isChecked():
             #    print('peaktrackerchecked')
             #else:
             #    self.read_values_btn.clicked.connect(self.WhenValuesBtnPress)
             
-            self.w5.addWidget(self.peakposbtn,row=0, col=1)
-            self.w5.addWidget(self.peaktrackerbtn, row=0, col=2)
+            self.w5.addWidget(self.STOPbtn,row=0, col=1)
+            self.w5.addWidget(self.startloopbtn, row=0, col=4)
             self.w5.addWidget(self.errortrackerbtn, row=0, col=3)
+            self.w5.addWidget(self.peaktrackerbtn, row=0, col=2)
             self.w5.addWidget(self.savereadouttoggle, row=1, col=1)
-            self.w5.addWidget(self.filenametosave, row=1, col=2, colspan=3)
+            self.w5.addWidget(self.filenametosave, row=1, col=2, colspan=4)
             
             #self.w5.addWidget(self.testlineedit, row=1, col=1, colspan=3)
 
@@ -786,7 +808,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         
     def WhenValuesBtnPress(self):
         #should talk to the arduino and update the interal gain values from what we have
-        if self.peaktrackerbtn.isChecked():
+        if self.startloopbtn.isChecked():
             self.readctrl['break'] = True
             print('going to try to read')
         else:
@@ -922,7 +944,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         
     def cavPgainChangeText(self):
         #this occurs when enter pressed in this LE
-        if self.peaktrackerbtn.isChecked(): #if the peak cycling is active, gotta update the parameter in the loop
+        if self.startloopbtn.isChecked(): #if the peak cycling is active, gotta update the parameter in the loop
             print('cavPgain change whilst tracker running')
             self.ctrl['break'] = True
             self.ctrl['value'] = str(self.cavPgainLE.text())
@@ -936,7 +958,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         
     def cavIgainChangeText(self):
         #this occurs when enter pressed in this LE
-        if self.peaktrackerbtn.isChecked(): #if the peak cycling is active, gotta update the parameter in the loop
+        if self.startloopbtn.isChecked(): #if the peak cycling is active, gotta update the parameter in the loop
             self.ctrl['break'] = True
             self.ctrl['value'] = str(self.cavIgainLE.text())
             self.ctrl['key'] = 'b'
@@ -949,7 +971,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         
     def laserPgainChangeText(self):
         #this occurs when enter pressed in this LE
-        if self.peaktrackerbtn.isChecked(): #if the peak cycling is active, gotta update the parameter in the loop
+        if self.startloopbtn.isChecked(): #if the peak cycling is active, gotta update the parameter in the loop
             self.ctrl['break'] = True
             self.ctrl['value'] = str(self.laserPgainLE.text())
             self.ctrl['key'] = 'c'
@@ -962,7 +984,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         
     def laserIgainChangeText(self):
         #this occurs when enter pressed in this LE
-        if self.peaktrackerbtn.isChecked(): #if the peak cycling is active, gotta update the parameter in the loop
+        if self.startloopbtn.isChecked(): #if the peak cycling is active, gotta update the parameter in the loop
             self.ctrl['break'] = True
             self.ctrl['value'] = str(self.laserIgainLE.text())
             self.ctrl['key'] = 'd'
@@ -975,7 +997,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
     
     def laserDgainChangeText(self):
         #this occurs when enter pressed in this LE
-        if self.peaktrackerbtn.isChecked(): #if the peak cycling is active, gotta update the parameter in the loop
+        if self.startloopbtn.isChecked(): #if the peak cycling is active, gotta update the parameter in the loop
             self.ctrl['break'] = True
             self.ctrl['value'] = str(self.laserDgainLE.text())
             self.ctrl['key'] = 'k'
@@ -988,7 +1010,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         
     def laserfreqsetpointChangeText(self):
         #this occurs when enter pressed in this LE
-        if self.peaktrackerbtn.isChecked(): #if the peak cycling is active, gotta update the parameter in the loop
+        if self.startloopbtn.isChecked(): #if the peak cycling is active, gotta update the parameter in the loop
             self.ctrl['break'] = True
             self.ctrl['value'] = str(self.tempstorageLFSP)
             self.ctrl['key'] = 'e'
@@ -1004,7 +1026,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         
     def cavoffsetpointChangeText(self):
         #this occurs when enter pressed in this LE
-        if self.peaktrackerbtn.isChecked(): #if the peak cycling is active, gotta update the parameter in the loop
+        if self.startloopbtn.isChecked(): #if the peak cycling is active, gotta update the parameter in the loop
             self.ctrl['break'] = True
             self.ctrl['value'] = str(self.tempstorageCOSP)
             self.ctrl['key'] = 'i'
@@ -1017,7 +1039,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
     
     def highthresholdChangeText(self):
         #this occurs when enter pressed in this LE
-        if self.peaktrackerbtn.isChecked(): #if the peak cycling is active, gotta update the parameter in the loop
+        if self.startloopbtn.isChecked(): #if the peak cycling is active, gotta update the parameter in the loop
             self.ctrl['break'] = True
             self.ctrl['value'] = str(self.tempstorageHT)
             self.ctrl['key'] = 'g'
@@ -1031,7 +1053,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
     
     def lowthresholdChangeText(self):
         #this occurs when enter pressed in this LE
-        if self.peaktrackerbtn.isChecked(): #if the peak cycling is active, gotta update the parameter in the loop
+        if self.startloopbtn.isChecked(): #if the peak cycling is active, gotta update the parameter in the loop
             self.ctrl['break'] = True
             self.ctrl['value'] = str(self.tempstorageLT)
             self.ctrl['key'] = 'f'
@@ -1168,7 +1190,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
     def LockBtn(self):
         #set the bump variable to low/high depending on what we want to do
         comport = self.general_things.parameter_loop_comboBox.currentText()
-        if self.peaktrackerbtn.isChecked(): #if we're running the loop, gotta do comm in worker
+        if self.startloopbtn.isChecked(): #if we're running the loop, gotta do comm in worker
             self.ctrllock['break'] = True #signal that this worker comm needs to happen
             if self.lock_btn.isChecked(): #depending on what the lock btn is doing, send instructions
                 self.ctrllock['value'] = 'nolock'
@@ -1375,40 +1397,48 @@ class ModifyandRead_variable(QtGui.QMainWindow):
           self.canvasEOT.hide()'''
           
     def UpdatePeakTracker(self):
-      #should take the updated data and then plot 
-      self.thread = QtCore.QThread()
-      self.worker = PeakPosTrackerThread(self.ctrl, self.readctrl, self.ctrllock)
-      self.worker.moveToThread(self.thread)
-      
-      #connect signals and slots
-      
-      
-      #this one should ensure the task will be called automatically when the function is called
-      self.thread.started.connect(self.worker.TASK)
-      self.worker.updated.connect(self.PlotPeakTrackerGraph)
-      self.worker.updated.connect(self.SavePeakPosAndError)
-      self.worker.readvalues.connect(self.UpdateAfterRead)
-      
-      #also connect the finsihed thread to quit and deleteLater
-
-      
-      #start the thread
-      self.thread.start()
-      #self.worker.updated.connect(self.PlotPeakTrackerGraph)
+      #should take the updated data and then plot
+      if self.startloopbtn.isChecked():
+          self.thread = QtCore.QThread()
+          self.worker = PeakPosTrackerThread(self.ctrl, self.readctrl, self.ctrllock, self.stopctrl)
+          self.worker.moveToThread(self.thread)
+          
+          #connect signals and slots
+          
+          
+          #this one should ensure the task will be called automatically when the function is called
+          self.thread.started.connect(self.worker.TASK)
+          if self.peaktrackerbtn.isChecked():
+              self.worker.updated.connect(self.PlotPeakTrackerGraph)
+          self.worker.updated.connect(self.SavePeakPosAndError)
+          self.worker.readvalues.connect(self.UpdateAfterRead)
+          self.worker.finished.connect(self.thread.quit)
+          self.worker.finished.connect(self.worker.deleteLater)
+          self.thread.finished.connect(self.thread.deleteLater)
+          
+          #also connect the finsihed thread to quit and deleteLater
+    
+          
+          #start the thread
+          self.thread.start()
+          #self.worker.updated.connect(self.PlotPeakTrackerGraph)
+      else:
+          pass
       
     def PlotPeakTrackerGraph(self, peakvalues):
       #peakvalues might be a list [1, 2, 3]
-      print('try to plot')
-      toplot1 = peakvalues[0]
-      toplot2 = peakvalues[1]
-      toplot3 = peakvalues[2]
-      time = peakvalues[3]
-      print(f'{[toplot1, toplot2, toplot3, time]}')
-      self.axPPOT.scatter(time, toplot1, color='deeppink', s=0.7)
-      self.axPPOT.scatter(time, toplot2, color='darkturquoise', s=0.7)
-      self.axPPOT.scatter(time, toplot3, color='orange', s=0.7)
-      
-      self.canvasPPOT.draw()
+     
+        print('try to plot')
+        toplot1 = peakvalues[0]
+        toplot2 = peakvalues[1]
+        toplot3 = peakvalues[2]
+        time = peakvalues[3]
+        print(f'{[toplot1, toplot2, toplot3, time]}')
+        self.axPPOT.scatter(time, toplot1, color='deeppink', s=0.7)
+        self.axPPOT.scatter(time, toplot2, color='darkturquoise', s=0.7)
+        self.axPPOT.scatter(time, toplot3, color='orange', s=0.7)
+        
+        self.canvasPPOT.draw()
       
     '''  
     def Break(self):
@@ -1446,3 +1476,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
     def SetFilePathToSave(self):
         param_file = QtGui.QFileDialog.getSaveFileName(self, 'Save Params', DIR_READOUT) 
         self.filenametosave.setText(param_file[0])
+        
+    def StopTracker(self):
+        self.stopctrl['break'] = True
+        print('set stop to break')
