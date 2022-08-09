@@ -464,7 +464,10 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             self.unit_swapcheckbox = QtGui.QCheckBox('ms?')
             
             self.peak1pos_label = QtGui.QPushButton('Peak 1')
+            
             self.peak2pos_label = QtGui.QPushButton('Peak 2')
+            self.peak2pos_label.clicked.connect(self.CopyFollowerLaserPos)
+            self.peak1pos_label.clicked.connect(self.CopyFirstPeakPos)
             self.peak3pos_label = QtGui.QLabel('Peak 3')
             self.peak3pos_label.setAlignment(QtCore.Qt.AlignCenter)
             self.peak3pos_label.setStyleSheet("border: 1px solid black")
@@ -529,7 +532,9 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             
             self.startloopbtn = QtGui.QPushButton('Start Loop')
             self.startloopbtn.setCheckable(True)
-            self.startloopbtn.setStyleSheet(':checked { color: orange; background: #fdd97c }') 
+            self.startloopbtn.setStyleSheet("QPushButton""{""background-color : navajowhite;""}""QPushButton::checked""{""color: orange; background: #fdd97c""}")
+             
+           # self.startloopbtn.setStyleSheet(':checked { color: orange; background: #fdd97c }') 
             #self.peaktrackerbtn.clicked.connect(self.ShowPeakPosOverTime)
             self.startloopbtn.clicked.connect(self.UpdatePeakTracker)
             
@@ -1480,3 +1485,22 @@ class ModifyandRead_variable(QtGui.QMainWindow):
     def StopTracker(self):
         self.stopctrl['break'] = True
         print('set stop to break')
+        
+        
+    def CopyFirstPeakPos(self):
+        '''transfer the value of the first peak pos from the box to the associated value box'''
+        firstpeakpos = self.peak1pos
+        self.cavoffsetpointLE.setText(firstpeakpos)
+        #change colour bc we've changed value- have to press values? to transfer to arduino
+       # self.cavoffsetpointLE.setStyleSheet("border: 1px solid black; background-color : lightsalmon")
+    
+    def CopyFollowerLaserPos(self):
+        #do I need to communicate directly with the arduino? in which case need to sort another ctrl variable
+        peak1pos = float(self.peak1pos)
+        peak2pos = float(self.peak2pos)
+        peak3pos = float(self.peak3pos)
+        r = (peak1pos-peak2pos)/(peak3pos-peak1pos)
+        self.laserfreqsetpointLE.setText(str(r*10**6))
+       # self.laserfreqsetpointLE.setStyleSheet("border: 1px solid black; background-color : lightsalmon")
+    
+        
