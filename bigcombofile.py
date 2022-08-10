@@ -29,13 +29,17 @@ import serial.tools.list_ports
 
 from PyQt5.QtGui import QFont
 
+# using now() to get current time
+current_time = datetime.datetime.now()
+
 import upkeep
 USUAL_DIR = os.getcwd()
 print(USUAL_DIR)
-DATEMARKER = str(date.today())
+DATEMARKER = str(current_time.day) + '-' + str(current_time.month) + '-' + str(current_time.year) + '-' + str(current_time.hour) + ':' + str(current_time.minute)
 
 DIR_PARAMS = USUAL_DIR+f'//({DATEMARKER})_lock_params'
 DIR_READOUT = USUAL_DIR+f'//({DATEMARKER})_lockdata'
+DIR_PEAKPOSPLOT = USUAL_DIR+f'//({DATEMARKER})_peakposplot'
 
 '''This bit will allow you to type in new values for the gains etc, and then write them to the arduino'''
 
@@ -50,7 +54,7 @@ class PeakPosTrackerThread(QtCore.QObject):
     finished = QtCore.pyqtSignal()
     #time = QtCore.pyqtSignal(float)
     
-    def __init__(self, ctrl, readctrl, ctrllock, ctrlstop):
+    def __init__(self, ctrl, readctrl, ctrllock, ctrlstop, ctrllocklaser, ctrllockcav, comport):
         QtCore.QThread.__init__(self)
         #ExpControl window is the parent
         #self.parent = parent
@@ -59,8 +63,11 @@ class PeakPosTrackerThread(QtCore.QObject):
         self.readctrl = readctrl
         self.ctrllock = ctrllock
         self.stopctrl = ctrlstop
+        self.ctrllocklaser = ctrllocklaser
+        self.ctrllockcav = ctrllockcav
         self.general_things = upkeep.Upkeep(self)
-        comport = self.general_things.parameter_loop_comboBox.currentText()
+        self.comport = comport
+        #comport = ModifyandRead_variable.parameter_loop_comboBox.currentText()
         self.arduino = serial.Serial(comport, 230400, timeout=.1)#should hopefully open the serial communication?
         
     
@@ -183,9 +190,37 @@ class PeakPosTrackerThread(QtCore.QObject):
                         self.arduino.write(str.encode('mh1!'))
                         print('should be locked')
                     if self.ctrllock['value'] == 'nolock':
-                        self.arduino.write(str.encode('mh1!'))
+                        self.arduino.write(str.encode('mh0!'))
                         print('should be unlocked')
                     self.ctrllock['break'] = False
+                    
+                if self.ctrllocklaser['break']:
+                    cavPgainmsg = 'm' + 'a' + str(self.ctrllocklaser['cavPgain']) + '!'
+                    cavIgainmsg = 'm' + 'a' + str(self.ctrllocklaser['cavIgain']) + '!'
+                    self.arduino.write(str.encode(cavPgainmsg))
+                    self.arduino.write(str.encode(cavIgainmsg))
+                    if self.ctrllocklaser['value'] == 'lock':
+                        self.arduino.write(str.encode('mh1!'))
+                        print(f'should be locked, {cavPgainmsg} and {cavIgainmsg}')
+                    if self.ctrllocklaser['value'] == 'nolock':
+                        self.arduino.write(str.encode('mh0!'))
+                        print(f'should be unlocked,{cavPgainmsg} and {cavIgainmsg}')
+                    self.ctrllocklaser['break'] = False
+                    
+                if self.ctrllockcav['break']:
+                    laserPgainmsg = 'm' + 'c' + str(self.ctrllockcav['laserPgain']) + '!'
+                    laserIgainmsg = 'm' + 'd' + str(self.ctrllockcav['laserIgain']) + '!'
+                    laserDgainmsg = 'm' + 'k' + str(self.ctrllockcav['laserDgain']) + '!'
+                    self.arduino.write(str.encode(laserPgainmsg))
+                    self.arduino.write(str.encode(laserIgainmsg))
+                    self.arduino.write(str.encode(laserDgainmsg))
+                    if self.ctrllockcav['value'] == 'lock':
+                        self.arduino.write(str.encode('mh1!'))
+                        print(f'should be locked, {laserPgainmsg} and {laserIgainmsg}and {laserDgainmsg}')
+                    if self.ctrllockcav['value'] == 'nolock':
+                        self.arduino.write(str.encode('mh0!'))
+                        print(f'should be unlocked,{laserPgainmsg} and {laserIgainmsg}and {laserDgainmsg}')
+                    self.ctrllockcav['break'] = False
                     
                 if self.stopctrl['break']:
                     
@@ -250,7 +285,17 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         self.ctrl = {'break': False, 'value': '120', 'key': 'b'}
         self.readctrl = {'break':False, 'cPvalue': '12', 'cPkey': 'a', 'cIvalue':'13', 'cIkey':'b', 'lPvalue':'14', 'lPkey':'c', 'lIvalue':'14', 'lIkey':'d', 'lDvalue':'15', 'lDkey':'q', 'LFOSvalue':'16', 'LFOSkey':'e', 'COSvalue':'17', 'COSkey':'p', 'HTvalue':'18', 'HTkey':'k', 'LTvalue':'19', 'LTkey':'j'}
         self.ctrllock = {'break': False, 'value': 'placeholder'}
-        self.stopctrl = {'break': False}
+        self.stopctrl = {'break': False}#
+        self.ctrllocklaser = {'break':False, 'lock':'placeholder', 'cavPgain':'44', 'cavIgain':'43'}
+        self.ctrllockcav = {'break':False, 'lock':'placeholder', 'laserPgain':'45', 'laserIgain':'46', 'laserDgain':'47'}
+        
+        self.plotinms = False
+        
+        self.storagecavPgain = 130
+        self.storagecavIgain = 140
+        self.storagelaserPgain = 150
+        self.storagelaserIgain = 160
+        self.storagelaserDgain = 170
         
         #self.t_max = 1000
         #self.time_resolution = 1
@@ -281,9 +326,15 @@ class ModifyandRead_variable(QtGui.QMainWindow):
     def createDocks(self):
             self.d1 = dockarea.Dock("AWG", size=(300,200))
             self.d1.hideTitleBar()
+            self.d2 = dockarea.Dock("AWG1", size=(300,200))
+            self.d2.hideTitleBar()
+            self.d3 = dockarea.Dock('AWG2', size=(1000,200))
+            self.d3.hideTitleBar()
             
             
-            self.area.addDock(self.d1, 'left')
+            #self.area.addDock(self.d1, 'left')
+            #self.area.addDock(self.d2, 'right')
+            #self.area.addDock(self.d3, 'right')
             
             #######################################################################
             ## w1: modify variables
@@ -294,13 +345,8 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             self.label_w1.setFont(QFont('Helvetica', 10))
             self.label_w1.setAlignment(QtCore.Qt.AlignCenter)
             
-            self.lock_btn = QtGui.QPushButton('Lock')
-            self.lock_btn.setCheckable(True)
-           # self.lock_btn.setStyleSheet(':unchecked {background-color: pink }')
-            #self.lock_btn.setStyleSheet('{background-color: pink } :checked { color: green; background-color: palegreen }')  
-            self.lock_btn.setStyleSheet("QPushButton""{""background-color : lightblue;""}""QPushButton::checked""{""color:green; background-color : palegreen;""}")
-                             
-            self.lock_btn.pressed.connect(self.LockBtn)
+            
+            
             
             
             #button to load values from a file
@@ -380,6 +426,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             
             self.blankspace= QtGui.QLabel('')
             self.blankspace2= QtGui.QLabel('')
+            self.blankspace4= QtGui.QLabel('')
             
             self.saveparamsbtn = QtGui.QPushButton('Save parameters?')
             self.saveparamsbtn.setStyleSheet(':hover { background: papayawhip }')
@@ -395,57 +442,87 @@ class ModifyandRead_variable(QtGui.QMainWindow):
     
     
             #buttons at the top
-            self.w1.addWidget(self.label_w1, row=0, col=0,colspan = 3)
-            self.w1.addWidget(self.lock_btn, row=0, col=3)
+           # self.w1.addWidget(self.label_w1, row=0, col=0)
+            
+            
             self.w1.addWidget(self.load_files_btn, row = 1,col=0, colspan=3)
             self.w1.addWidget(self.read_values_btn, row = 1, col= 3)
             self.w1.addWidget(self.save_params_checkbox, row = 2, col= 1)
             
+            self.w1.addWidget(self.blankspace4, row= 3, col=0, colspan=3)
+            
             #adding in line edit boxes
-            self.w1.addWidget(self.cavPgainLE, row = 3, col = 2)
-            self.w1.addWidget(self.cavIgainLE, row = 4, col = 2)
-            self.w1.addWidget(self.laserPgainLE, row = 5, col = 2)
-            self.w1.addWidget(self.laserIgainLE, row = 6, col = 2)
-            self.w1.addWidget(self.laserDgainLE, row = 7, col = 2)
-            self.w1.addWidget(self.laserfreqsetpointLE, row = 8, col = 2)
-            self.w1.addWidget(self.cavoffsetpointLE, row = 9, col = 2)
-            self.w1.addWidget(self.highthresholdLE, row = 10, col = 2)
-            self.w1.addWidget(self.lowthresholdLE, row = 11, col = 2)
+            self.w1.addWidget(self.cavPgainLE, row = 4, col = 2)
+            self.w1.addWidget(self.cavIgainLE, row = 5, col = 2)
+            self.w1.addWidget(self.laserPgainLE, row = 6, col = 2)
+            self.w1.addWidget(self.laserIgainLE, row = 7, col = 2)
+            self.w1.addWidget(self.laserDgainLE, row = 8, col = 2)
+            self.w1.addWidget(self.laserfreqsetpointLE, row = 9, col = 2)
+            self.w1.addWidget(self.cavoffsetpointLE, row = 10, col = 2)
+            self.w1.addWidget(self.highthresholdLE, row = 11, col = 2)
+            self.w1.addWidget(self.lowthresholdLE, row = 12, col = 2)
             #labels
-            self.w1.addWidget(self.label_cavPgainLE, row = 3, col = 1)
-            self.w1.addWidget(self.label_cavIgainLE, row = 4, col = 1)
-            self.w1.addWidget(self.label_laserPgainLE, row = 5, col = 1)
-            self.w1.addWidget(self.label_laserIgainLE, row = 6, col = 1)
-            self.w1.addWidget(self.label_laserDgainLE, row = 7, col = 1)
-            self.w1.addWidget(self.label_laserfreqsetpointLE, row = 8, col = 1)
-            self.w1.addWidget(self.label_cavoffsetpointLE, row = 9, col = 1)
-            self.w1.addWidget(self.label_highthresholdLE, row = 10, col = 1)
-            self.w1.addWidget(self.label_lowthresholdLE, row = 11, col = 1)
+            self.w1.addWidget(self.label_cavPgainLE, row = 4, col = 1)
+            self.w1.addWidget(self.label_cavIgainLE, row = 5, col = 1)
+            self.w1.addWidget(self.label_laserPgainLE, row = 6, col = 1)
+            self.w1.addWidget(self.label_laserIgainLE, row = 7, col = 1)
+            self.w1.addWidget(self.label_laserDgainLE, row = 8, col = 1)
+            self.w1.addWidget(self.label_laserfreqsetpointLE, row = 9, col = 1)
+            self.w1.addWidget(self.label_cavoffsetpointLE, row = 10, col = 1)
+            self.w1.addWidget(self.label_highthresholdLE, row = 11, col = 1)
+            self.w1.addWidget(self.label_lowthresholdLE, row = 12, col = 1)
             # values
-            self.w1.addWidget(self.cavPgainvalue, row = 3, col = 3)
-            self.w1.addWidget(self.cavIgainvalue, row = 4, col = 3)
-            self.w1.addWidget(self.laserPgainvalue, row = 5, col = 3)
-            self.w1.addWidget(self.laserIgainvalue, row = 6, col = 3)
-            self.w1.addWidget(self.laserDgainvalue, row = 7, col = 3)
-            self.w1.addWidget(self.laserfreqsetpointvalue, row = 8, col = 3)
-            self.w1.addWidget(self.cavoffsetpointvalue, row = 9, col = 3)
-            self.w1.addWidget(self.highthresholdvalue, row = 10, col = 3)
-            self.w1.addWidget(self.lowthresholdvalue, row = 11, col = 3)
+            self.w1.addWidget(self.cavPgainvalue, row = 4, col = 3)
+            self.w1.addWidget(self.cavIgainvalue, row = 5, col = 3)
+            self.w1.addWidget(self.laserPgainvalue, row = 6, col = 3)
+            self.w1.addWidget(self.laserIgainvalue, row = 7, col = 3)
+            self.w1.addWidget(self.laserDgainvalue, row = 8, col = 3)
+            self.w1.addWidget(self.laserfreqsetpointvalue, row = 9, col = 3)
+            self.w1.addWidget(self.cavoffsetpointvalue, row = 10, col = 3)
+            self.w1.addWidget(self.highthresholdvalue, row = 11, col = 3)
+            self.w1.addWidget(self.lowthresholdvalue, row = 12, col = 3)
             
             
-            self.w1.addWidget(self.blankspace2, row = 12, col= 0, colspan= 1) #this is literally just to help with the spacing
+            self.w1.addWidget(self.blankspace2, row = 13, col= 0, colspan= 1) #this is literally just to help with the spacing
             
-            self.w1.addWidget(self.swaptoms_btn, row = 13, col= 2, colspan= 1) #this is literally just to help with the spacing
+            self.w1.addWidget(self.swaptoms_btn, row = 14, col= 2, colspan= 1) #this is literally just to help with the spacing
             
-            self.w1.addWidget(self.swaptomV_btn, row = 13, col= 3, colspan= 1) #this is literally just to help with the spacing
-            self.w1.addWidget(self.swapunits_label, row = 13, col= 1, colspan= 1) #this is literally just to help with the spacing
+            self.w1.addWidget(self.swaptomV_btn, row = 14, col= 3, colspan= 1) #this is literally just to help with the spacing
+            self.w1.addWidget(self.swapunits_label, row = 14, col= 1, colspan= 1) #this is literally just to help with the spacing
           
             
-            self.w1.addWidget(self.blankspace, row = 14, col= 0, colspan= 4) #this is literally just to help with the spacing
+            self.w1.addWidget(self.blankspace, row = 15, col= 0, colspan= 4) #this is literally just to help with the spacing
             
            # self.w1.addWidget(self.errordetailtest, row = 15, col=0)
            
+            ##########################################################################
+            ##########################################################################
+            
+            self.w9 = pg.LayoutWidget()
            
+            self.lock_btn = QtGui.QPushButton('Lock')
+            self.lock_btn.setCheckable(True)
+           # self.lock_btn.setStyleSheet(':unchecked {background-color: pink }')
+            #self.lock_btn.setStyleSheet('{background-color: pink } :checked { color: green; background-color: palegreen }')  
+            self.lock_btn.setStyleSheet("QPushButton""{""background-color : lightblue;""}""QPushButton::checked""{""color:green; background-color : palegreen;""}")
+                             
+            self.lock_btn.pressed.connect(self.LockBtn)
+            
+             
+            self.lockjustlaserbtn = QtGui.QPushButton('Lock laser')
+            self.lockjustlaserbtn.setCheckable(True)
+            self.lockjustlaserbtn.setStyleSheet("QPushButton""{""background-color : lightblue;""}""QPushButton::checked""{""color:green; background-color : palegreen;""}")
+            self.lockjustlaserbtn.clicked.connect(self.LockJustLaser)
+            
+            
+            self.lockjustcavbtn = QtGui.QPushButton('Lock cav')
+            self.lockjustcavbtn.setCheckable(True)
+            self.lockjustcavbtn.setStyleSheet("QPushButton""{""background-color : lightblue;""}""QPushButton::checked""{""color:green; background-color : palegreen;""}")
+            self.lockjustcavbtn.clicked.connect(self.LockJustCavity)
+            
+            self.w9.addWidget(self.lock_btn, row=0, col=1)
+            self.w9.addWidget(self.lockjustlaserbtn, row=0, col=2)
+            self.w9.addWidget(self.lockjustcavbtn, row=0, col=3)
            
            ###########################################################################
            #readout related
@@ -462,6 +539,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             self.read_peakpos_btn.clicked.connect(self.PlotPeaks)
             self.read_peakpos_btn.setStyleSheet(':hover { background: powderblue }')
             self.unit_swapcheckbox = QtGui.QCheckBox('ms?')
+            
             
             self.peak1pos_label = QtGui.QPushButton('Peak 1')
             
@@ -493,7 +571,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             self.blankspace= QtGui.QLabel('')
 
             self.w2.addWidget(self.read_peakpos_btn, row=0, col=0)
-            self.w2.addWidget(self.unit_swapcheckbox, row=1, col=0)
+            #self.w2.addWidget(self.unit_swapcheckbox, row=1, col=0)
             self.w2.addWidget(self.peak1pos_label, row=0, col=1)
             self.w2.addWidget(self.peak2pos_label, row=0, col=2)
             self.w2.addWidget(self.peak3pos_label, row=0, col= 3, colspan=2)
@@ -619,27 +697,79 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             axEOT.set_ylabel('Error')
             
             
+            self.blankspace3 = QtGui.QLabel('')
 
             self.w6.addWidget(self.canvasEOT, row=0, col=0)
+            #self.w6.addWidget(self.blankspace3, row=0, col=7)
+            
+            
+            #######################################################################
+            ## w8: Choose COM port
+            #######################################################################
+    
+            self.w8 = pg.LayoutWidget()
+            self.label_comport = QtGui.QLabel('COM port')
+            self.label_comport.setFont(QFont('Helvetica', 10))
+            self.label_comport.setStyleSheet(':hover { background: lightpink }') #this is just set to change colour when hovered over for now, but ideally goes green if the COM port you've selected is all good
+    
+            self.label_comport.setAlignment(QtCore.Qt.AlignLeft)
+            
+            self.parameter_loop_comboBox = QtGui.QComboBox() 
+            #finding all the available COM ports and adding their names to the drop down menu
+            list_serialports = serial.tools.list_ports.comports()
+            for n in range(len(list_serialports)):
+                test = list_serialports[n][0]
+                self.parameter_loop_comboBox.addItem(str(test)) 
+            
+            
+        
+            self.w8.addWidget(self.label_comport, row=0, col=0,colspan = 1)
+            self.w8.addWidget(self.parameter_loop_comboBox, row = 0, col = 1,colspan = 1) 
+            
             
             
             
           
-        
+            '''
             #modify and read variables stuff
             self.d1.addWidget(self.w1, row=0, col=0, rowspan=8)
+            self.d1.addWidget(self.w8, row=14, col=0)
                
             #readout things
             self.d1.addWidget(self.w2, row=9, col=0, rowspan=3)
-            
-            
+
             self.d1.addWidget(self.w5, row=0, col=2, rowspan=1)
             self.d1.addWidget(self.w7, row=1, col=2, rowspan=2)
             self.d1.addWidget(self.w3, row=3, col=2, rowspan=4)
-            self.d1.addWidget(self.w6, row=7, col=2, rowspan=5)
+            
+            self.d1.addWidget(self.w6, row=7, col=2, rowspan=5)'''
             #self.d1.addWidget(self.w4, row=4, col=2)
-           
-           
+            #modify and read variables stuff
+            
+            
+            
+            self.d1.addWidget(self.w8, row=0, col=0)
+            self.d1.addWidget(self.w1, row=1, col=0, rowspan=8)
+               
+            self.d2.addWidget(self.w9, row=0, col=0, rowspan=1)
+            self.d2.addWidget(self.w5, row=1, col=0, rowspan=3)
+            self.d2.addWidget(self.w7, row=4, col=0, rowspan=5)
+            self.d2.addWidget(self.w2, row=9, col=0, rowspan=4)
+            
+            self.d3.addWidget(self.w3, row=0, col=2, rowspan=6)
+            self.d3.addWidget(self.w6, row=6, col=2, rowspan=7)
+            '''
+            self.d2.addWidget(self.w9, row=0, col=0, rowspan=1)
+            self.d2.addWidget(self.w5, row=1, col=0, rowspan=1)
+            self.d2.addWidget(self.w2, row=3, col=0, rowspan=3)
+            self.d2.addWidget(self.w7, row=6, col=0, rowspan=2)
+
+            
+            
+            self.d2.addWidget(self.w3, row=0, col=1, rowspan=4, colspan=7)
+            self.d2.addWidget(self.w6, row=5, col=1, rowspan=5, colspan=7)
+           '''
+            
            
            
           
@@ -696,7 +826,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
 
     def TalktoArduino(self):
         #choose the COM port to set up for serial communication using the drop down menu
-        comport = self.general_things.parameter_loop_comboBox.currentText()
+        comport = self.parameter_loop_comboBox.currentText()
 
         try:
             arduino = serial.Serial(comport, self.baudrate, timeout=.1)#should hopefully open the serial communication?
@@ -774,7 +904,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         self.laserIgainvalue.setText(str(round(float(self.laserIgain),3)))
         self.laserDgainvalue.setText(str(round(float(self.laserDgain),3)))
         if self.swaptoms_btn.isChecked(): #should these values be loaded in ms or AU
-            self.laserfreqsetpointMS = float(self.laserfreqsetpoint)/84000
+            self.laserfreqsetpointMS = float(self.laserfreqsetpoint)#/84000
             self.laserfreqsetpointvalue.setText(str(round(self.laserfreqsetpointMS,3)))
             self.cavoffsetpointMS = float(self.cavoffsetpoint)/84000
             self.cavoffsetpointvalue.setText(str(round(self.cavoffsetpointMS,3)))
@@ -828,7 +958,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             self.laserIgainvalue.setText(str(round(float(self.laserIgain),3)))
             self.laserDgainvalue.setText(str(round(float(self.laserDgain),3)))
             if self.swaptoms_btn.isChecked(): #should these values be loaded in ms or AU
-                self.laserfreqsetpointMS = float(self.laserfreqsetpoint)/84000
+                self.laserfreqsetpointMS = float(self.laserfreqsetpoint)#/84000
                 self.laserfreqsetpointvalue.setText(str(round(self.laserfreqsetpointMS,3)))
                 self.cavoffsetpointMS = float(self.cavoffsetpoint)/84000
                 self.cavoffsetpointvalue.setText(str(round(self.cavoffsetpointMS,3)))
@@ -921,7 +1051,8 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         self.laserIgainLE.setText(str(dict['laserIgain'] ))
         self.laserDgainLE.setText(str(dict['laserDgain']))
         if self.swaptoms_btn.isChecked(): #display in ms (won't send to arduino in ms)
-            self.laserfreqsetpointLE.setText(str(np.round(dict['laserfreqsetpoint']/84000,4)))
+            self.laserfreqsetpointLE.setText(str(dict['laserfreqsetpoint']))
+            #self.laserfreqsetpointLE.setText(str(np.round(dict['laserfreqsetpoint'],4)))#/84000,4)))
             self.cavoffsetpointLE.setText(str(np.round(dict['cavoffsetpoint']/84000,4)))
         else:
             self.laserfreqsetpointLE.setText(str(dict['laserfreqsetpoint']))
@@ -1074,16 +1205,16 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         #this occurs when the ms swap units box is checked
         #just changes how the value is displayed, doesn't alter the actual value being stored and sent to arduino
         if self.swaptoms_btn.isChecked():
-            self.label_laserfreqsetpointLE.setStyleSheet("color : deeppink")
+            #self.label_laserfreqsetpointLE.setStyleSheet("color : deeppink")
             self.label_cavoffsetpointLE.setStyleSheet("color : deeppink")
             
             #change the units that things are displayed in:
             #read boxes
-            self.laserfreqsetpointMS = float(self.laserfreqsetpoint)/84000
+            self.laserfreqsetpointMS = float(self.laserfreqsetpoint)#/84000
             self.laserfreqsetpointvalue.setText(str(np.round(self.laserfreqsetpointMS,3)))
             #write box
             self.tempstorageLFSP = self.laserfreqsetpointLE.text()
-            LFSPinms = float(self.tempstorageLFSP)/84000
+            LFSPinms = float(self.tempstorageLFSP)#/84000
             self.laserfreqsetpointLE.setText(str(np.round(LFSPinms,3)))
            
             #read boxes
@@ -1111,7 +1242,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         if self.swaptoms_btn.isChecked():
             #then we're writing in ms
             placeholder = self.laserfreqsetpointLE.text()
-            self.tempstorageLFSP = float(placeholder)*84000
+            self.tempstorageLFSP = float(placeholder)#*84000
             placeholder2 = self.cavoffsetpointLE.text()
             self.tempstorageCOSP = float(placeholder2)*84000
         else:
@@ -1175,7 +1306,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         #key here should specify which value you're trying to send to arduino
         #value is the new value you want to send 
         
-        comport = self.general_things.parameter_loop_comboBox.currentText()
+        comport = self.parameter_loop_comboBox.currentText()
         
         message = 'm' + str(key) + str(value) + '!' #encode given data into a message the arduino can understand
         #print(f'message is {message}')
@@ -1194,7 +1325,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
 
     def LockBtn(self):
         #set the bump variable to low/high depending on what we want to do
-        comport = self.general_things.parameter_loop_comboBox.currentText()
+        comport = self.parameter_loop_comboBox.currentText()
         if self.startloopbtn.isChecked(): #if we're running the loop, gotta do comm in worker
             self.ctrllock['break'] = True #signal that this worker comm needs to happen
             if self.lock_btn.isChecked(): #depending on what the lock btn is doing, send instructions
@@ -1245,7 +1376,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
     def ExtractPeakPos(self):
       #TALKING TO THE ARDUINO, UPDATE VALUES IN PYTHON CODE
       #choose the COM port to set up for serial communication using the drop down menu
-      comport = self.general_things.parameter_loop_comboBox.currentText()
+      comport = self.parameter_loop_comboBox.currentText()
 
       try:
           arduino = serial.Serial(comport, self.baudrate, timeout=.1)#should hopefully open the serial communication?
@@ -1276,7 +1407,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
       #talk to the arduino
       self.ExtractPeakPos()
       #update the labels here- taking care to use the selected units
-      if self.unit_swapcheckbox.isChecked(): #ie if we want ms
+      if self.swaptoms_btn.isChecked(): #ie if we want ms
           newunitpeak1pos = float(self.peak1pos)/(84*1000000*10**-3)
           newunitpeak2pos = float(self.peak2pos)/(84*1000000*10**-3)
           newunitpeak3pos = float(self.peak3pos)/(84*1000000*10**-3)
@@ -1291,7 +1422,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
      
     def ExtractError(self):
       #choose the COM port to set up for serial communication using the drop down menu
-      comport = self.general_things.parameter_loop_comboBox.currentText()
+      comport = self.parameter_loop_comboBox.currentText()
     
       try:
           arduino = serial.Serial(comport, self.baudrate, timeout=.1)#should hopefully open the serial communication?
@@ -1334,7 +1465,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
       self.figure.subplots_adjust(0.05, 0.4, 0.95, 0.95) # left,bottom,right,top 
       ax.tick_params(left = False, labelleft=False)
       
-      if self.unit_swapcheckbox.isChecked():
+      if self.swaptoms_btn.isChecked():
           ax.set_xlabel("Peak position (ms)")
           ax.axvline(x=float(self.peak1pos)/84000, ymin=0, ymax= 1, color='#ffa62b')
           ax.axvline(x=float(self.peak2pos)/84000, ymin=0, ymax= 1, color='#ffa62b')
@@ -1404,8 +1535,15 @@ class ModifyandRead_variable(QtGui.QMainWindow):
     def UpdatePeakTracker(self):
       #should take the updated data and then plot
       if self.startloopbtn.isChecked():
+          self.axPPOT.clear()
+          #setting something to check whether we should be plotting in ms or AU
+          if self.swaptoms_btn.isChecked():
+              self.plotinms = True
+          else:
+              self.plotinms = False
+          
           self.thread = QtCore.QThread()
-          self.worker = PeakPosTrackerThread(self.ctrl, self.readctrl, self.ctrllock, self.stopctrl)
+          self.worker = PeakPosTrackerThread(self.ctrl, self.readctrl, self.ctrllock, self.stopctrl, self.ctrllocklaser, self.ctrllockcav, self.parameter_loop_comboBox.currentText())
           self.worker.moveToThread(self.thread)
           
           #connect signals and slots
@@ -1432,17 +1570,22 @@ class ModifyandRead_variable(QtGui.QMainWindow):
       
     def PlotPeakTrackerGraph(self, peakvalues):
       #peakvalues might be a list [1, 2, 3]
-     
+        
         print('try to plot')
         toplot1 = peakvalues[0]
         toplot2 = peakvalues[1]
         toplot3 = peakvalues[2]
         time = peakvalues[3]
         print(f'{[toplot1, toplot2, toplot3, time]}')
-        self.axPPOT.scatter(time, toplot1, color='deeppink', s=0.7)
-        self.axPPOT.scatter(time, toplot2, color='darkturquoise', s=0.7)
-        self.axPPOT.scatter(time, toplot3, color='orange', s=0.7)
-        
+        if self.plotinms:
+            self.axPPOT.scatter(time, float(toplot1)/84000, color='deeppink', s=0.7)
+            self.axPPOT.scatter(time, float(toplot2)/84000, color='darkturquoise', s=0.7)
+            self.axPPOT.scatter(time, float(toplot3)/84000, color='orange', s=0.7)
+        else:
+            self.axPPOT.scatter(time, toplot1, color='deeppink', s=0.7)
+            self.axPPOT.scatter(time, toplot2, color='darkturquoise', s=0.7)
+            self.axPPOT.scatter(time, toplot3, color='orange', s=0.7)
+            
         self.canvasPPOT.draw()
       
     '''  
@@ -1486,21 +1629,141 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         self.stopctrl['break'] = True
         print('set stop to break')
         
+        #saving the peak pos over time graph
+        if  self.savereadouttoggle.isChecked():
+            param_file = QtGui.QFileDialog.getSaveFileName(self, 'Save Params', DIR_PEAKPOSPLOT) 
+            
+            if param_file:
+                self.figurePPOT.savefig(param_file[0])
+
+        
         
     def CopyFirstPeakPos(self):
         '''transfer the value of the first peak pos from the box to the associated value box'''
         firstpeakpos = self.peak1pos
-        self.cavoffsetpointLE.setText(firstpeakpos)
-        #change colour bc we've changed value- have to press values? to transfer to arduino
-       # self.cavoffsetpointLE.setStyleSheet("border: 1px solid black; background-color : lightsalmon")
+        
+        self.WritetoArduino('i', firstpeakpos)
+        
+        if self.swaptoms_btn.isChecked():
+            self.cavoffsetpointLE.setText(str(np.round(float(firstpeakpos)/84000,4)))
+        else:
+            self.cavoffsetpointLE.setText(str(np.round(float(firstpeakpos),4)))
+        
+        self.cavoffsetpointLE.setStyleSheet("border: 1px solid black; background-color : lightsalmon")
     
     def CopyFollowerLaserPos(self):
         #do I need to communicate directly with the arduino? in which case need to sort another ctrl variable
         peak1pos = float(self.peak1pos)
         peak2pos = float(self.peak2pos)
         peak3pos = float(self.peak3pos)
-        r = (peak1pos-peak2pos)/(peak3pos-peak1pos)
-        self.laserfreqsetpointLE.setText(str(r*10**6))
-       # self.laserfreqsetpointLE.setStyleSheet("border: 1px solid black; background-color : lightsalmon")
+        r = (peak2pos-peak1pos)/(peak3pos-peak1pos)
+        scaledr = r*10**6
+        
+        self.WritetoArduino('e', scaledr)
+        self.laserfreqsetpointLE.setText(str(scaledr))
+        self.laserfreqsetpointLE.setStyleSheet("border: 1px solid black; background-color : lightsalmon")
     
         
+    def LockJustLaser(self):
+        ''' For locking just the laser - artifically send zero cav gains to the arduino then lock'''
+        
+        if self.lockjustlaserbtn.isChecked():
+            print('locking')
+            #set the storage values to the current internal ones
+            self.storagecavIgain = self.cavIgain
+            self.storagecavPgain = self.cavPgain
+            #send arduino some zero values for cav gain
+            if self.startloopbtn.isChecked():
+                print('locked while looping')
+                #should set the ctrl value
+                self.ctrllocklaser['value'] = 'lock'
+                self.ctrllocklaser['cavPgain'] = '0'
+                self.ctrllocklaser['cavIgain'] = '0'
+                self.ctrllocklaser['break'] = True
+                
+            else:
+                self.WritetoArduino('a', 0)
+                self.WritetoArduino('b', 0)
+                #then send the locking message
+                self.WritetoArduino('h', 1)
+        else:
+            print('unlokcing')
+            #set the internal values and the displayed ones to the storage values
+            self.cavIgain = self.storagecavIgain 
+            self.cavPgain = self.storagecavPgain 
+            #read boxes
+            self.cavPgainvalue.setText(str(round(float(self.cavPgain),3)))
+            self.cavIgainvalue.setText(str(round(float(self.cavIgain),3)))
+            #write boxes
+            self.cavPgainLE.setText(str(round(float(self.cavPgain),3)))
+            self.cavIgainLE.setText(str(round(float(self.cavIgain),3)))
+            if self.startloopbtn.isChecked():
+                #should set ctrl value
+                print('unlocking while looped')
+                self.ctrllocklaser['value'] = 'nolock'
+                self.ctrllocklaser['cavPgain'] = str(self.cavPgain)
+                self.ctrllocklaser['cavIgain'] = str(self.cavIgain)
+                self.ctrllocklaser['break'] = True
+            else:
+                #unlock the arduino
+                self.WritetoArduino('h', 0)
+                #send new values to arduino
+                self.WritetoArduino('a', self.cavPgain)
+                self.WritetoArduino('b', self.cavIgain)
+            
+            
+    def LockJustCavity(self):           
+    
+        if self.lockjustcavbtn.isChecked():
+            print('locking')
+            #set the storage values to the current internal ones
+            self.storagelaserPgain = self.laserPgain
+            self.storagelaserIgain = self.laserIgain
+            self.storagelaserDgain = self.laserDgain
+            #send arduino some zero values for cav gain
+            if self.startloopbtn.isChecked():
+                print('locked while looping')
+                #should set the ctrl value
+                self.ctrllockcav['value'] = 'lock'
+                self.ctrllockcav['laserPgain'] = '0'
+                self.ctrllockcav['laserIgain'] = '0'
+                self.ctrllockcav['laserDgain'] = '0'
+                self.ctrllockcav['break'] = True
+                
+            else:
+                self.WritetoArduino('c', 0)
+                self.WritetoArduino('d', 0)
+                self.WritetoArduino('k', 0)
+                #then send the locking message
+                self.WritetoArduino('h', 1)
+        else:
+            print('unlokcing')
+            #set the internal values and the displayed ones to the storage values
+            self.laserPgain = self.storagelaserPgain
+            self.laserIgain = self.storagelaserIgain
+            self.laserDgain = self.storagelaserDgain
+            
+            #read boxes
+            self.laserPgainvalue.setText(str(round(float(self.laserPgain),3)))
+            self.laserIgainvalue.setText(str(round(float(self.laserIgain),3)))
+            self.laserDgainvalue.setText(str(round(float(self.laserDgain),3)))
+            #write boxes
+            self.laserPgainLE.setText(str(round(float(self.laserPgain),3)))
+            self.laserIgainLE.setText(str(round(float(self.laserIgain),3)))
+            self.laserDgainLE.setText(str(round(float(self.laserDgain),3)))
+            
+            if self.startloopbtn.isChecked():
+                #should set ctrl value
+                print('unlocking while looped')
+                self.ctrllockcav['value'] = 'nolock'
+                self.ctrllockcav['laserPgain'] = str(self.laserPgain)
+                self.ctrllockcav['laserIgain'] = str(self.laserIgain)
+                self.ctrllockcav['laserDgain'] = str(self.laserDgain)
+                self.ctrllockcav['break'] = True
+            else:
+                #unlock the arduino
+                self.WritetoArduino('h', 0)
+                #send new values to arduino
+                self.WritetoArduino('c', self.laserPgain)
+                self.WritetoArduino('d', self.laserIgain)
+                self.WritetoArduino('k', self.laserDgain)
