@@ -47,7 +47,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
 
     def initUI(self):
         #AWG
-        self.cavPgain = 1
+        self.cavPgain = 9
         self.cavIgain = 2
         self.laserPgain = 3
         self.laserIgain = 4
@@ -366,7 +366,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             #self.errordetailtest.setText('whoops the arduino is not there TEST')
             #self.general_things.errordetails.setText('whoops the arduino is not there UPKEEP')
             print(self.general_things.errordetails.text())
-            print(self.errordetailtest.text())
+           # print(self.errordetailtest.text())
             #upkeep.Upkeep.errordetails.setText('whoops the arduino is not there')
             print('whoops the arduino is not there') 
             
