@@ -55,7 +55,7 @@ class PeakPosTrackerThread(QtCore.QObject):
     updatederr = QtCore.pyqtSignal(list)
     
     
-    def __init__(self, ctrl, readctrl, ctrllock, ctrlstop, ctrllocklaser, ctrllockcav, comport):
+    def __init__(self, ctrl, readctrl, ctrllock, ctrlstop, ctrllocklaser, ctrllockcav, ctrlpeakdisplay, comport):
         QtCore.QThread.__init__(self)
         
         #various control parameters that allow control from the main thread 
@@ -67,6 +67,7 @@ class PeakPosTrackerThread(QtCore.QObject):
         self.stopctrl = ctrlstop
         self.ctrllocklaser = ctrllocklaser
         self.ctrllockcav = ctrllockcav
+        self.ctrlpeakdisplay = ctrlpeakdisplay
         
         self.general_things = upkeep.Upkeep(self)
         self.comport = comport
@@ -303,6 +304,8 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         self.stopctrl = {'break': False}#
         self.ctrllocklaser = {'break':False, 'lock':'placeholder', 'cavPgain':'44', 'cavIgain':'43'}
         self.ctrllockcav = {'break':False, 'lock':'placeholder', 'laserPgain':'45', 'laserIgain':'46', 'laserDgain':'47'}
+        self.ctrlpeakdisplay = {'break':False, }
+        
         
         #helps with live plotting the peak positions in the desired units
         self.plotinms = False
@@ -343,7 +346,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             #######################################################################
     
             self.w1 = pg.LayoutWidget()
-            self.label_w1 = QtGui.QLabel('Locking parameters')
+            self.label_w1 = QtGui.QLabel('STCL')
             self.label_w1.setFont(QFont('Helvetica', 10))
             self.label_w1.setAlignment(QtCore.Qt.AlignCenter)
             
@@ -351,7 +354,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             #button to load values from a file
             self.load_files_btn = QtGui.QPushButton('Load parameters')
             self.load_files_btn.clicked.connect(self.LoadParameters)
-            self.load_files_btn.setStyleSheet(':hover { background: aquamarine }')
+            self.load_files_btn.setStyleSheet(':hover {background: aquamarine}')
             
             #button to read the values and update them
             self.read_values_btn = QtGui.QPushButton('Values?')
@@ -704,9 +707,9 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             self.w8 = pg.LayoutWidget()
             self.label_comport = QtGui.QLabel('COM port')
             self.label_comport.setFont(QFont('Helvetica', 10))
-            self.label_comport.setStyleSheet(':hover { background: lightpink }') #this is just set to change colour when hovered over for now, but ideally goes green if the COM port you've selected is all good
-    
-            self.label_comport.setAlignment(QtCore.Qt.AlignLeft)
+            
+            self.label_comport.setAlignment(QtCore.Qt.AlignRight)
+            
             
             self.parameter_loop_comboBox = QtGui.QComboBox() 
             #finding all the available COM ports and adding their names to the drop down menu
@@ -715,10 +718,17 @@ class ModifyandRead_variable(QtGui.QMainWindow):
                 test = list_serialports[n][0]
                 self.parameter_loop_comboBox.addItem(str(test)) 
             
+            if len(list_serialports) == 0: 
+                self.label_comport.setStyleSheet('color : tomato') 
+    
             
-        
-            self.w8.addWidget(self.label_comport, row=0, col=0,colspan = 1)
-            self.w8.addWidget(self.parameter_loop_comboBox, row = 0, col = 1,colspan = 1) 
+            self.infobutton = QtGui.QPushButton('?')
+            self.infobutton.resize(0.01,0.01)
+            
+            self.w8.addWidget(self.infobutton, row=0, col=0)
+            self.w8.addWidget(self.blankspace, row = 0, col= 1, colspan=4)
+            self.w8.addWidget(self.label_comport, row=0, col=5,colspan = 8)
+            self.w8.addWidget(self.parameter_loop_comboBox, row = 0, col = 14,colspan = 4) 
             
             
             
@@ -1371,7 +1381,8 @@ class ModifyandRead_variable(QtGui.QMainWindow):
     
     def WhenPeakPosBtnPressed(self):
       #talk to the arduino, get the peak pos
-      self.ExtractPeakPos()
+      if self.startloopbtn.isChecked() == False:
+          self.ExtractPeakPos()
       
       #update the labels here- taking care to use the selected units
       if self.swaptoms_btn.isChecked(): #ie if we want ms
@@ -1385,6 +1396,15 @@ class ModifyandRead_variable(QtGui.QMainWindow):
           self.peak1posvalue.setText(str(round(float(self.peak1pos),3)))
           self.peak2posvalue.setText(str(round(float(self.peak2pos),3)))
           self.peak3posvalue.setText(str(round(float(self.peak3pos),3)))
+          
+    
+    def UpdateInternalPeakPos(self, peakvalues):
+        #should update the internal peak values as the loop is occuring
+        self.peak1pos = peakvalues[0]
+        self.peak2pos = peakvalues[1]
+        self.peak3pos = peakvalues[2]
+        
+        
           
      
     def ExtractError(self):
@@ -1470,7 +1490,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
           
           #generate the worker thread 
           self.thread = QtCore.QThread()
-          self.worker = PeakPosTrackerThread(self.ctrl, self.readctrl, self.ctrllock, self.stopctrl, self.ctrllocklaser, self.ctrllockcav, self.parameter_loop_comboBox.currentText())
+          self.worker = PeakPosTrackerThread(self.ctrl, self.readctrl, self.ctrllock, self.stopctrl, self.ctrllocklaser, self.ctrllockcav, self.ctrlpeakdisplay, self.parameter_loop_comboBox.currentText())
           self.worker.moveToThread(self.thread)
           
           
@@ -1492,6 +1512,9 @@ class ModifyandRead_variable(QtGui.QMainWindow):
               self.axEOT2.set_xlabel('Time (s)')
               self.axEOT2.set_ylabel('Cavity error')
               
+              
+          #update the internal peak params
+          self.worker.updated.connect(self.UpdateInternalPeakPos)
           #save the data each time the loop comes round
           self.worker.updated.connect(self.SavePeakPosAndError)
           #calculate and display the cumulative RMS errors
@@ -1615,9 +1638,6 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         #ie lock the cavity where it currently is
         firstpeakpos = self.peak1pos
         
-        #send this new value to arduino 
-        self.WritetoArduino('i', firstpeakpos)
-        
         #then just update the display
         if self.swaptoms_btn.isChecked():
             self.cavoffsetpointLE.setText(str(np.round(float(firstpeakpos)/84000,4)))
@@ -1625,6 +1645,14 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             self.cavoffsetpointLE.setText(str(np.round(float(firstpeakpos),4)))
         
         self.cavoffsetpointLE.setStyleSheet("border: 1px solid black; background-color : lightsalmon")
+        
+        if self.startloopbtn.isChecked(): #if the peak cycling is active, gotta update the parameter in the loop
+            self.ctrl['break'] = True
+            self.ctrl['value'] = str(firstpeakpos) 
+            self.ctrl['key'] = 'i'
+        else:
+            #send this new value to arduino 
+            self.WritetoArduino('i', firstpeakpos)
     
     def CopyFollowerLaserPos(self):
         #transfer the value of the r calc from current peak pos from the box to the associated value box
@@ -1635,13 +1663,19 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         r = (peak2pos-peak1pos)/(peak3pos-peak1pos)
         scaledr = r*10**6
         
-        #send this value to the arduino
-        self.WritetoArduino('e', scaledr)
-        
         #update the display
         self.laserfreqsetpointLE.setText(str(scaledr))
         self.laserfreqsetpointLE.setStyleSheet("border: 1px solid black; background-color : lightsalmon")
-    
+        
+        if self.startloopbtn.isChecked(): #if the peak cycling is active, gotta update the parameter in the loop
+            self.ctrl['break'] = True
+            self.ctrl['value'] = str(scaledr) 
+            self.ctrl['key'] = 'e'
+        else:
+            #send this value to the arduino
+            self.WritetoArduino('e', scaledr)
+            
+            
         
     def LockJustLaser(self):
         #For locking just the laser - artifically send zero cav gains to the arduino then lock
