@@ -88,7 +88,7 @@ class PeakPosTrackerThread(QtCore.QObject):
             
             starttime = time.time() #find the time at which the data taking starts
             
-            while time.time()< (starttime+30): 
+            while time.time()< (starttime+360): 
                 print("tick")
                 
                 #set peak 1
@@ -387,6 +387,17 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         #storage lists to help with calculating the rms error values
         self.lasererrorvalues = []
         self.caverrorvalues = []
+        
+        #storage variables to detect big jumps in peaks
+        self.prevpeak1pos = 1
+        self.prevpeak2pos = 1
+        self.prevpeak3pos = 1
+        self.misidenttimestamps = []
+        
+        self.peakpos1storage = []
+        self.peakpos2storage = []
+        self.peakpos3storage = []
+        self.highthresholdstorage = []
         
 
 
@@ -956,9 +967,9 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             self.laserfreqsetpointvalue.setText(str(round(float(self.laserfreqsetpoint),3)))
             self.cavoffsetpointvalue.setText(str(round(float(self.cavoffsetpoint),3)))
         if self.swaptomV_btn.isChecked():
-            self.highthresholdMS = float(self.highthreshold)/100
+            self.highthresholdMS = float(self.highthreshold)/(4096/3300)
             self.highthresholdvalue.setText(str(round(self.highthresholdMS,3)))
-            self.lowthresholdMS = float(self.lowthreshold)/100
+            self.lowthresholdMS = float(self.lowthreshold)/(4096/3300)
             self.lowthresholdvalue.setText(str(round(self.lowthresholdMS,3)))
         else:
             self.highthresholdvalue.setText(str(round(float(self.highthreshold),3)))
@@ -1009,9 +1020,9 @@ class ModifyandRead_variable(QtGui.QMainWindow):
                 self.laserfreqsetpointvalue.setText(str(round(float(self.laserfreqsetpoint),3)))
                 self.cavoffsetpointvalue.setText(str(round(float(self.cavoffsetpoint),3)))
             if self.swaptomV_btn.isChecked():
-                self.highthresholdMS = float(self.highthreshold)/100
+                self.highthresholdMS = float(self.highthreshold)/(4096/3300)
                 self.highthresholdvalue.setText(str(round(self.highthresholdMS,3)))
-                self.lowthresholdMS = float(self.lowthreshold)/100
+                self.lowthresholdMS = float(self.lowthreshold)/(4096/3300)
                 self.lowthresholdvalue.setText(str(round(self.lowthresholdMS,3)))
             else:
                 self.highthresholdvalue.setText(str(round(float(self.highthreshold),3)))
@@ -1100,8 +1111,8 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             self.laserfreqsetpointLE.setText(str(dict['laserfreqsetpoint']))
             self.cavoffsetpointLE.setText(str(dict['cavoffsetpoint']))
         if self.swaptomV_btn.isChecked(): #display in mV (won't send to arduino in mV)
-            self.highthresholdLE.setText(str(np.round(dict['highthreshold']/100,4)))
-            self.lowthresholdLE.setText(str(np.round(dict['lowthreshold']/100,4)))
+            self.highthresholdLE.setText(str(np.round(dict['highthreshold']/(4096/3300),4)))
+            self.lowthresholdLE.setText(str(np.round(dict['lowthreshold']/(4096/3300),4)))
         else:
             self.highthresholdLE.setText(str(dict['highthreshold']))
             self.lowthresholdLE.setText(str(dict['lowthreshold']))
@@ -1298,9 +1309,9 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         if self.swaptomV_btn.isChecked():
             #then we're writing in mV
             placeholder = self.highthresholdLE.text()
-            self.tempstorageHT = float(placeholder)*100
+            self.tempstorageHT = float(placeholder)*(4096/3300)
             placeholder2 = self.lowthresholdLE.text()
-            self.tempstorageLT = float(placeholder2)*100
+            self.tempstorageLT = float(placeholder2)*(4096/3300)
         else:
             #we're writing in AU
             self.tempstorageHT = self.highthresholdLE.text()
@@ -1317,19 +1328,19 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             
             #change the units that things are displayed in:
             #read boxes
-            self.highthresholdMS = float(self.highthreshold)/100
+            self.highthresholdMS = float(self.highthreshold)/(4096/3300)
             self.highthresholdvalue.setText(str(np.round(self.highthresholdMS,3)))
             #write box
             self.tempstorageHT = self.highthresholdLE.text()
-            HTinms = float(self.tempstorageHT)/100
+            HTinms = float(self.tempstorageHT)/(4096/3300)
             self.highthresholdLE.setText(str(np.round(HTinms,3)))
            
             #read boxes
-            self.lowthresholdMS = float(self.lowthreshold)/100
+            self.lowthresholdMS = float(self.lowthreshold)/(4096/3300)
             self.lowthresholdvalue.setText(str(np.round(self.lowthresholdMS,3)))
             #write box
             self.tempstorageLT = self.lowthresholdLE.text()
-            LTinms = float(self.tempstorageLT)/100
+            LTinms = float(self.tempstorageLT)/(4096/3300)
             self.lowthresholdLE.setText(str(np.round(LTinms,3)))
             
                 
@@ -1414,10 +1425,6 @@ class ModifyandRead_variable(QtGui.QMainWindow):
 
 
 
-
-
-
-
     def ExtractPeakPos(self):
       #Extract the values of the peak postions being stored in the arduino
       comport = self.parameter_loop_comboBox.currentText()
@@ -1445,6 +1452,9 @@ class ModifyandRead_variable(QtGui.QMainWindow):
           print('port closed in talking')
       except (OSError, serial.SerialException):
           print('whoops the arduino is not there')  
+
+      print('########################################')
+      print([self.peak1pos, self.peak2pos, self.peak3pos])
           
     
     def WhenPeakPosBtnPressed(self):
@@ -1464,6 +1474,14 @@ class ModifyandRead_variable(QtGui.QMainWindow):
           self.peak1posvalue.setText(str(round(float(self.peak1pos),3)))
           self.peak2posvalue.setText(str(round(float(self.peak2pos),3)))
           self.peak3posvalue.setText(str(round(float(self.peak3pos),3)))
+         
+      self.highthresholdstorage.append(float(self.highthreshold))    
+      self.peakpos1storage.append(float(self.peak1pos.strip())) 
+      self.peakpos2storage.append(float(self.peak2pos.strip())) 
+      self.peakpos3storage.append(float(self.peak3pos.strip()))
+      
+      
+    
           
     
     def UpdateInternalPeakPos(self, peakvalues):
@@ -1471,6 +1489,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         self.peak1pos = peakvalues[0]
         self.peak2pos = peakvalues[1]
         self.peak3pos = peakvalues[2]
+        print('internal updated')
         
         
           
@@ -1511,7 +1530,6 @@ class ModifyandRead_variable(QtGui.QMainWindow):
     def PlotPeaks(self):
     #this occurs when the 'peaks?' button is pressed, and plots the current peak positions in the little 
     #horizontal graph
-    
       self.ExtractPeakPos()
       
     # clearing old figure
@@ -1530,13 +1548,14 @@ class ModifyandRead_variable(QtGui.QMainWindow):
           ax.axvline(x=float(self.peak3pos)/84000, ymin=0, ymax= 1, color='#ffa62b')
       else:
           ax.set_xlabel("Peak position (AU)")
-          ax.axvline(x=self.peak1pos, ymin=0, ymax= 1)
-          ax.axvline(x=self.peak2pos, ymin=0, ymax= 1)
-          ax.axvline(x=self.peak3pos, ymin=0, ymax= 1)
+          ax.axvline(x=float(self.peak1pos), ymin=0, ymax= 1)
+          ax.axvline(x=float(self.peak2pos), ymin=0, ymax= 1)
+          ax.axvline(x=float(self.peak3pos), ymin=0, ymax= 1)
       
     # refresh canvas
       self.canvas.draw()
       
+      print([float(self.peak1pos),float(self.peak2pos),float(self.peak3pos)])
 
           
     def UpdatePeakTracker(self):
@@ -1607,9 +1626,9 @@ class ModifyandRead_variable(QtGui.QMainWindow):
       #takes the peak position values from the worker thread and plots them
         
         print('try to plot')
-        toplot1 = peakvalues[0]
-        toplot2 = peakvalues[1]
-        toplot3 = peakvalues[2]
+        toplot1 = peakvalues[0].strip()
+        toplot2 = peakvalues[1].strip()
+        toplot3 = peakvalues[2].strip()
         time = peakvalues[3]
         print(f'{[toplot1, toplot2, toplot3, time]}')
         
@@ -1618,13 +1637,40 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             self.axPPOT.scatter(time, float(toplot1)/84000, color='deeppink', s=0.7)
             self.axPPOT.scatter(time, float(toplot2)/84000, color='darkturquoise', s=0.7)
             self.axPPOT.scatter(time, float(toplot3)/84000, color='orange', s=0.7)
+            '''if time != 0: #just to avoid the first time step
+                if np.abs(float(toplot1) - float(self.prevpeak1pos)) > 0.03:
+                    print('ooh there is a misidentification of 1!')
+                    self.misidenttimestamps.append(time)
+                if np.abs(float(toplot2) - float(self.prevpeak2pos)) > 0.03:
+                    print('ooh there is a misidentification of 2!')
+                    self.misidenttimestamps.append(time)
+                if np.abs(float(toplot3) - float(self.prevpeak3pos)) > 0.03:
+                    print('ooh there is a misidentification of 3!')
+                    self.misidenttimestamps.append(time)'''
+                
         else:
-            self.axPPOT.scatter(time, toplot1, color='deeppink', s=0.7)
-            self.axPPOT.scatter(time, toplot2, color='darkturquoise', s=0.7)
-            self.axPPOT.scatter(time, toplot3, color='orange', s=0.7)
+            self.axPPOT.scatter(time, float(toplot1), color='deeppink', s=0.7)
+            self.axPPOT.scatter(time, float(toplot2), color='darkturquoise', s=0.7)
+            self.axPPOT.scatter(time, float(toplot3), color='orange', s=0.7)
+            '''if time != 0: #just to avoid the first time step
+                if np.abs(float(toplot1) - float(self.prevpeak1pos)) > 2000:
+                    print('ooh there is a misidentification of 1!')
+                    self.misidenttimestamps.append(time)
+                if np.abs(float(toplot2) - float(self.prevpeak2pos)) > 2000:
+                    print('ooh there is a misidentification of 2!')
+                    self.misidenttimestamps.append(time)
+                if np.abs(float(toplot3) - float(self.prevpeak3pos)) > 2000:
+                    print('ooh there is a misidentification of 3!')
+                    self.misidenttimestamps.append(time)'''
             
         #refresh the canvas
         self.canvasPPOT.draw()
+        
+        '''
+        #update the prev values for comparison
+        self.prevpeak1pos = toplot1
+        self.prevpeak2pos = toplot2
+        self.prevpeak3pos = toplot3'''
         
     def PlotErrorTrackerGraph(self, errorvalues):
         #takes the error values from the worker thread and plots them
@@ -1683,6 +1729,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         print('set stop to break')
         
         #saving the various graphs if the save data toggle is on
+        '''
         if  self.savereadouttoggle.isChecked():
             param_file = QtGui.QFileDialog.getSaveFileName(self, 'Save Params', DIR_PEAKPOSPLOT) 
             
@@ -1697,7 +1744,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             param_fileE2 = QtGui.QFileDialog.getSaveFileName(self, 'Save Params', DIR_CAVERRORPLOT) 
             
             if param_fileE2:
-                self.figureEOT2.savefig(param_fileE2[0])
+                self.figureEOT2.savefig(param_fileE2[0])'''
 
         
         
@@ -1795,6 +1842,7 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             
     def LockJustCavity(self):      
         #locking just the cavity by setting the laser gains to 0
+        
     
         if self.lockjustcavbtn.isChecked():
             print('locking')
@@ -1860,11 +1908,11 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         self.lasererrorvalues.append(float(lasererr.strip()))
         self.caverrorvalues.append(float(caverr.strip()))
         
-        print(self.lasererrorvalues)
+        #print(self.lasererrorvalues)
         rmslasererr = np.sqrt((np.sum(np.array(self.lasererrorvalues)**2))/len(self.lasererrorvalues))
         rmscaverr = np.sqrt((np.sum(np.array(self.caverrorvalues)**2))/len(self.caverrorvalues))
         
-        print(rmslasererr)
+        #print(rmslasererr)
         #then want to display then somewhere in the GUi
         self.laserRMSvalue.setText(str(rmslasererr))
         self.cavRMSvalue.setText(str(rmscaverr))
@@ -1875,3 +1923,13 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         if self.w is None:
             self.w = AnotherWindow()
         self.w.show()
+        
+        '''
+        print('peak 1')
+        print(self.peakpos1storage)
+        print('peak 2')
+        print(self.peakpos2storage)
+        print('peak 3')
+        print(self.peakpos3storage)
+        print('high threshold')
+        print(self.highthresholdstorage)'''
