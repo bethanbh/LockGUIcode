@@ -701,6 +701,9 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             self.filenametosave = QtGui.QLineEdit('example filename')
             self.filenametosave.returnPressed.connect(self.SetFilePathToSave)
             
+            self.savegraphsbtn = QtGui.QPushButton('Save graphs')
+            self.savegraphsbtn.clicked.connect(self.SaveCurrentGraphs)
+            
             #if checked, will plot the peak positions
             self.peaktrackerbtn = QtGui.QPushButton('Peak Tracker')
             self.peaktrackerbtn.setCheckable(True)
@@ -714,7 +717,8 @@ class ModifyandRead_variable(QtGui.QMainWindow):
             self.w5.addWidget(self.peaktrackerbtn, row=0, col=2)
             
             self.w5.addWidget(self.savereadouttoggle, row=1, col=1)
-            self.w5.addWidget(self.filenametosave, row=1, col=2, colspan=3)
+            self.w5.addWidget(self.filenametosave, row=1, col=2, colspan=2)
+            self.w5.addWidget(self.savegraphsbtn, row=1, col=4 )
             
            
             #######################################################################
@@ -1933,3 +1937,21 @@ class ModifyandRead_variable(QtGui.QMainWindow):
         print(self.peakpos3storage)
         print('high threshold')
         print(self.highthresholdstorage)'''
+        
+    def SaveCurrentGraphs(self):
+        #saving the various graphs if wanted
+        
+        param_file = QtGui.QFileDialog.getSaveFileName(self, 'Save Params', DIR_PEAKPOSPLOT) 
+        
+        if param_file:
+            self.figurePPOT.savefig(param_file[0])
+            
+        param_fileE = QtGui.QFileDialog.getSaveFileName(self, 'Save Params', DIR_LASERRORPLOT) 
+        
+        if param_fileE:
+            self.figureEOT.savefig(param_fileE[0])
+            
+        param_fileE2 = QtGui.QFileDialog.getSaveFileName(self, 'Save Params', DIR_CAVERRORPLOT) 
+        
+        if param_fileE2:
+            self.figureEOT2.savefig(param_fileE2[0])
